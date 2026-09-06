@@ -105,10 +105,38 @@ select id, email, 'SUPER_ADMIN' from auth.users where email = 'you@example.com'
 on conflict (user_id) do update set role = excluded.role;
 ```
 
-3. Sign out and back in.
+3. Hard-refresh `/admin` (Ctrl+Shift+R).
+
+The session persists across reloads (`persistSession: true`), and the role is
+fetched in a `useEffect` keyed on user id, so a refresh re-reads `admin_users`.
+**Signing out is not required** and on a project using the built-in SMTP it is
+actively harmful — see below.
 
 This is deliberately a manual, privileged step. There is no self-service path
 to becoming an editor, because an editor can publish a deadline.
+
+### Sign-in methods, and the email rate limit
+
+Supabase's built-in SMTP is rate-limited **per project, not per address**. Once
+it trips, magic links stop arriving for every address, and if you have also
+signed out you are locked out of the admin panel until it resets. Trying a
+second email address does not help: it shares the same counter, and it creates
+a different `auth.users` row that your `admin_users` grant does not cover.
+
+The sign-in form therefore offers three methods, defaulting to the one that
+sends no email:
+
+| Method | Sends email | Setup required |
+|---|---|---|
+| **Password** (default) | no | enable password sign-in on the email provider |
+| Magic link | yes | none, but rate-limited |
+| Google | no | configure the Google provider |
+
+To set a password for an existing user: **Authentication → Users → ⋯ → Reset
+password**, or create the user with **Add user** and tick *Auto Confirm User*.
+
+If you are locked out with no password set, the SQL editor is unaffected by
+any of this — it runs privileged and does not need an app session.
 
 ## Adding a round by hand
 

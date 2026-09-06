@@ -14,8 +14,13 @@ const ADMIN_NAV = [
 ];
 
 function SignIn() {
-  const { signInWithGoogle, signInWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signInWithPassword } = useAuth();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  // Password is the default because the project-wide auth mail rate limit
+  // makes magic links unreliable, and hitting it locks you out of the admin
+  // panel entirely rather than just delaying you.
+  const [mode, setMode] = useState<'password' | 'link'>('password');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,26 +66,68 @@ function SignIn() {
             onSubmit={(e) => {
               e.preventDefault();
               run(async () => {
-                await signInWithEmail(email);
-                setSent(true);
+                if (mode === 'password') {
+                  await signInWithPassword(email, password);
+                } else {
+                  await signInWithEmail(email);
+                  setSent(true);
+                }
               });
             }}
           >
             <input
               type="email"
               required
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               className="field"
             />
+            {mode === 'password' && (
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                className="field mt-3"
+              />
+            )}
             <button type="submit" disabled={busy} className="btn-primary mt-3 w-full">
-              Email me a sign-in link
+              {mode === 'password' ? 'Sign in' : 'Email me a sign-in link'}
             </button>
           </form>
         )}
 
-        {error && <p className="mt-4 text-xs text-red-600">{error}</p>}
+        {!sent && (
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === 'password' ? 'link' : 'password');
+              setError(null);
+            }}
+            className="mt-4 w-full text-center text-2xs text-ink-500 hover:text-ink-900"
+          >
+            {mode === 'password'
+              ? 'Use an email sign-in link instead'
+              : 'Sign in with a password instead'}
+          </button>
+        )}
+
+        {error && (
+          <p role="alert" className="mt-4 text-xs text-red-600 dark:text-red-400">
+            {error}
+            {/* The rate limit is per project, not per address, so retrying
+                with a different email fails identically. */}
+            {error.toLowerCase().includes('rate limit') && (
+              <span className="mt-1 block text-ink-500">
+                This limit applies to the whole project. Use password sign-in instead.
+              </span>
+            )}
+          </p>
+        )}
 
         <Link to="/" className="mt-6 block text-center text-2xs text-ink-500 hover:text-ink-900">
           ← Back to MBAround

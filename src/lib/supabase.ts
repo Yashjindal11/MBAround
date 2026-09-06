@@ -6,10 +6,10 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 /**
  * True when real Supabase credentials are configured.
  *
- * When false the data-access layer falls back to the local development
- * fixture (`src/lib/queries/fixture.ts`) so the UI can be built and reviewed
- * before a Supabase project is connected. The fixture is dev-only scaffolding
- * and is never the source of truth in production.
+ * When false there is no data at all: the query layer throws rather than
+ * falling back to anything. An earlier version served a local fixture here,
+ * which was removed precisely because a misconfigured deploy would have
+ * rendered invented deadlines that looked identical to real ones.
  */
 export const isSupabaseConfigured = Boolean(
   url && anonKey && !url.includes('your-project-ref'),

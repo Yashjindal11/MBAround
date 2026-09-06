@@ -11,9 +11,14 @@ interface AuthState {
   /** True only when the DB confirms a row in `admin_users`. */
   isEditor: boolean;
   isAdmin: boolean;
-  isSuperAdmin: boolean;
-  signInWithGoogle: () => Promise<void>;
+  isSuperAdmin: boolean;  signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string) => Promise<void>;
+  /**
+   * Password sign-in. Sends no email, so it is unaffected by the project-wide
+   * auth mail rate limit that makes magic links unusable during development.
+   * Requires the email provider to have password sign-in enabled.
+   */
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -81,13 +86,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           options: { redirectTo },
         });
         if (error) throw error;
-      },
-      signInWithEmail: async (email: string) => {
+      },      signInWithEmail: async (email: string) => {
         if (!supabase) throw new Error('Supabase is not configured.');
         const { error } = await supabase.auth.signInWithOtp({
           email,
           options: { emailRedirectTo: redirectTo },
         });
+        if (error) throw error;
+      },
+      signInWithPassword: async (email: string, password: string) => {
+        if (!supabase) throw new Error('Supabase is not configured.');
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       },
       signOut: async () => {
