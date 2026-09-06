@@ -31,6 +31,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 interface ProgramSeed {
   name: string;
   programType: string;
+  /**
+   * The programme's own admissions page. Required whenever a school lists more
+   * than one programme: Kellogg's and Cornell's one-year and two-year MBAs run
+   * on different calendars, and reading both from the school-level URL gave
+   * them identical deadlines.
+   */
+  admissionsUrl?: string | null;
 }
 interface SchoolSeed {
   name: string;
@@ -45,6 +52,52 @@ interface FoundRound {
   /** ISO yyyy-mm-dd, or null when the school has not announced it. */
   deadline: string | null;
   sourceUrl: string;
+  /**
+   * Position derived from the round's own number, not from where it happened
+   * to appear in the HTML. Wharton listed Round 3 before Round 1, and ordering
+   * by document position rendered Round 3 first.
+   */
+  order: number;
+}
+
+const WORD_NUMBERS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+};
+
+/** The label keywords this parser recognises, in their canonical casing. */
+const LABEL_WORDS = ['Round', 'Stage', 'Cycle'] as const;
+
+/**
+ * Canonicalises the casing of a round label without rewriting its meaning.
+ *
+ * Pages shout "ROUND 1" or whisper "round 1"; both are the same round, and
+ * leaving them distinct produced duplicate rows under the
+ * (application_cycle_id, name) unique key's notion of difference. Only the
+ * recognised keyword and word-numbers are touched - "Stage 1" stays a stage
+ * and is never renamed to "Round 1", because a school that runs stages does
+ * not run rounds.
+ */
+export function normaliseRoundName(label: string): string {
+  let out = label.replace(/\s+/g, ' ').trim();
+  for (const word of LABEL_WORDS) {
+    out = out.replace(new RegExp(`^${word}\\b`, 'i'), word);
+  }
+  return out.replace(
+    /\b(one|two|three|four|five)\b/i,
+    (w) => w[0].toUpperCase() + w.slice(1).toLowerCase(),
+  );
+}
+
+/** Pulls the ordinal out of "Round 2" / "Stage Three". */
+export function roundNumber(label: string): number | null {
+  const digits = label.match(/(\d+)/);
+  if (digits) return Number(digits[1]);
+  const word = label.toLowerCase().match(/\b(one|two|three|four|five)\b/);
+  return word ? WORD_NUMBERS[word[1]] : null;
 }
 
 function lit(v: string | number | null | undefined): string {
@@ -120,8 +173,21 @@ export function htmlToText(html: string): string {
  * Finds "Round N ... <date>" pairings. Round labels are taken from the page
  * rather than assumed, so schools using "Stage 1" or rolling admission are
  * not forced into an R1/R2/R3 shape they do not have.
+ *
+ * Returns [] rather than a partial set when a numbered sequence has a gap.
+ * A missing round is worse than no data: the page renders as complete, and an
+ * applicant planning around the earliest deadline never learns it existed.
+ *
+ * `cycleStartYear` is the plausibility window. Admissions sites routinely
+ * leave last cycle's table live below this year's copy, and a stale deadline
+ * that has already passed is indistinguishable from a current one once it is
+ * in the database.
  */
-export function extractRounds(text: string, sourceUrl: string): FoundRound[] {
+export function extractRounds(
+  text: string,
+  sourceUrl: string,
+  cycleStartYear?: number,
+): FoundRound[] {
   const found: FoundRound[] = [];
   const seen = new Set<string>();
 
@@ -137,16 +203,50 @@ export function extractRounds(text: string, sourceUrl: string): FoundRound[] {
 
   let m: RegExpExecArray | null;
   while ((m = pattern.exec(text)) !== null) {
-    const roundName = m[1].replace(/\s+/g, ' ').trim();
-    if (seen.has(roundName.toLowerCase())) continue;
+    const roundName = normaliseRoundName(m[1]);
+    const key = roundName.toLowerCase();
+    if (seen.has(key)) continue;
 
     // Still bounded: a date hundreds of characters away is unrelated prose,
     // not this round's deadline.
     const deadline = parseDeadlineText(m[2].slice(0, 160));
     if (!deadline) continue;
 
-    seen.add(roundName.toLowerCase());
-    found.push({ roundName, deadline, sourceUrl });
+    // A 2026-27 cycle's deadlines fall in 2026 or 2027. Anything else is last
+    // year's table left live on the page, or a date belonging to some other
+    // part of the site.
+    if (cycleStartYear !== undefined) {
+      const year = Number(deadline.slice(0, 4));
+      if (year !== cycleStartYear && year !== cycleStartYear + 1) {
+        console.error(
+          `  ! ${roundName}: ${deadline} outside cycle ${cycleStartYear}-${cycleStartYear + 1} — discarding all`,
+        );
+        return [];
+      }
+    }
+
+    const n = roundNumber(roundName);
+    if (n === null) continue;
+
+    seen.add(key);
+    found.push({ roundName, deadline, sourceUrl, order: n });
+  }
+
+  if (found.length === 0) return [];
+
+  found.sort((a, b) => a.order - b.order);
+
+  // A numbered sequence must start at 1 and have no holes. Anything else means
+  // the page had rounds this parser could not see (Kellogg produced rounds 2
+  // and 3 with no Round 1), and a partial set must not be importable.
+  const numbers = found.map((r) => r.order);
+  const complete =
+    numbers[0] === 1 && numbers.every((n, i) => i === 0 || n === numbers[i - 1] + 1);
+  if (!complete) {
+    console.error(
+      `  ! incomplete round sequence [${numbers.join(', ')}] — discarding all`,
+    );
+    return [];
   }
 
   return found;
@@ -200,27 +300,46 @@ async function main() {
   let withDates = 0;
   let withoutDates = 0;
 
+  /** Fetch-and-parse memoised per URL, so shared URLs cost one request. */
+  const cache = new Map<string, FoundRound[]>();
+  async function roundsFor(url: string): Promise<FoundRound[]> {
+    const hit = cache.get(url);
+    if (hit) return hit;
+    const html = await fetchPage(url);
+    const rounds = html ? extractRounds(htmlToText(html), url, startYear) : [];
+    cache.set(url, rounds);
+    return rounds;
+  }
+
   for (const school of targets) {
-    if (!school.admissionsUrl) {
-      console.error(`- ${school.name}: no admissions URL, skipping`);
-      continue;
-    }
-
     console.error(`- ${school.name}`);
-    const html = await fetchPage(school.admissionsUrl);
-    const rounds = html
-      ? extractRounds(htmlToText(html), school.admissionsUrl)
-      : [];
-
-    if (rounds.length === 0) {
-      console.error('  = no rounds extracted (will not invent any)');
-      withoutDates++;
-    } else {
-      console.error(`  = ${rounds.length} round(s) with dates`);
-      withDates++;
-    }
 
     for (const program of school.programs) {
+      // A school-level URL may only speak for a school with one programme.
+      // Where a school runs several, each needs its own page or it gets none:
+      // copying one page's dates across programmes fabricated deadlines for
+      // every programme but the one the page described.
+      const url =
+        program.admissionsUrl ??
+        (school.programs.length === 1 ? school.admissionsUrl : null);
+
+      if (!url) {
+        console.error(
+          `  = ${program.name}: no programme-specific admissions URL, skipping`,
+        );
+        withoutDates++;
+        continue;
+      }
+
+      const rounds = await roundsFor(url);
+      if (rounds.length === 0) {
+        console.error(`  = ${program.name}: no rounds extracted (will not invent any)`);
+        withoutDates++;
+      } else {
+        console.error(`  = ${program.name}: ${rounds.length} round(s) with dates`);
+        withDates++;
+      }
+
       out.push(`-- ${school.name} / ${program.name}`);
       // end_year is NOT NULL with no default, and 'CURRENT' is a cycle_status
       // value — an earlier version omitted the former and passed 'NEEDS_REVIEW'
@@ -237,7 +356,7 @@ async function main() {
       out.push(`on conflict (program_id, cycle_name) do nothing;`);
       out.push('');
 
-      for (const [i, r] of rounds.entries()) {
+      for (const r of rounds) {
         // Column names must match migration 0001 exactly: the table uses
         // application_cycle_id / name / display_order, and has no status
         // column. An earlier version invented cycle_id / round_name /
@@ -246,7 +365,10 @@ async function main() {
           `insert into application_rounds (application_cycle_id, name, display_order, deadline, is_announced, is_verified, source_url)`,
         );
         out.push(
-          `select c.id, ${lit(r.roundName)}, ${i + 1}, ${lit(r.deadline)}, true, false, ${lit(r.sourceUrl)}`,
+          // display_order comes from the round's own number, never from array
+          // position: Wharton lists Round 3 first, and positional ordering
+          // rendered it first in the UI too.
+          `select c.id, ${lit(r.roundName)}, ${r.order}, ${lit(r.deadline)}, true, false, ${lit(r.sourceUrl)}`,
         );
         out.push(`from application_cycles c`);
         out.push(`join programs p on p.id = c.program_id`);
@@ -262,8 +384,8 @@ async function main() {
   console.log(out.join('\n'));
 
   console.error('');
-  console.error(`Schools with extracted dates : ${withDates}`);
-  console.error(`Schools with none            : ${withoutDates}`);
+  console.error(`Programmes with extracted dates : ${withDates}`);
+  console.error(`Programmes with none            : ${withoutDates}`);
   console.error('Nothing was invented for the second group.');
 }
 
