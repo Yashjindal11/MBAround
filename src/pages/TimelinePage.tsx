@@ -1,6 +1,4 @@
 ﻿import { useMemo, useState } from 'react';
-import { useAsync } from '../lib/useAsync';
-import { getDeadlines, getSchools } from '../lib/queries/public';
 import {
   countdownLabel,
   daysUntil,
@@ -8,12 +6,18 @@ import {
   parseDate,
   verificationState,
 } from '../lib/dates';
-import { EmptyState, ErrorState, LoadingState } from '../components/States';
+import { ErrorState, LoadingState } from '../components/States';
 import { VerificationBadge } from '../components/VerificationBadge';
 import { ScopeRail, useSchoolScope } from '../components/SchoolScope';
+import {
+  DemoBanner,
+  TimelineEmpty,
+  TimelineViewSwitcher,
+} from '../components/TimelineChrome';
+import { useTimelineData } from '../components/useTimelineData';
 import { useSeo } from '../lib/seo';
 import { breadcrumbSchema } from '../lib/structuredData';
-import type { DeadlineRow, School } from '../lib/types';
+import type { DeadlineRow } from '../lib/types';
 
 const TIMELINE_JSONLD = [
   breadcrumbSchema([
@@ -33,23 +37,10 @@ const TIMELINE_JSONLD = [
 export default function TimelinePage() {
   const [deselected, setDeselected] = useState<string[]>([]);
 
-  const {
-    data: schools,
-    loading: schoolsLoading,
-    error: schoolsError,
-    reload: reloadSchools,
-  } = useAsync(() => getSchools(), []);
-  const {
-    data: rows,
-    loading: rowsLoading,
-    error: rowsError,
-  } = useAsync(() => getDeadlines({ includePast: true }), []);
-
-  const allSchools = useMemo<School[]>(() => schools ?? [], [schools]);
-  const allRows = useMemo<DeadlineRow[]>(() => rows ?? [], [rows]);
+  const { schools, rows, loading, error, reload, isDemo } = useTimelineData();
 
   /** Region / country / programme facets, shared with the compare page. */
-  const scope = useSchoolScope(allSchools, allRows);
+  const scope = useSchoolScope(schools, rows);
 
   const isSelected = (slug: string) => !deselected.includes(slug);
 
@@ -89,7 +80,7 @@ export default function TimelinePage() {
   );
 
   const inScope = useMemo(
-    () => (rows ?? []).filter((r) => selectedIds.has(r.schoolId)),
+    () => rows.filter((r) => selectedIds.has(r.schoolId)),
     [rows, selectedIds],
   );
 
@@ -166,9 +157,6 @@ export default function TimelinePage() {
     return [...map.entries()];
   }, [dated]);
 
-  const loading = schoolsLoading || rowsLoading;
-  const error = schoolsError ?? rowsError;
-
   const rail = (
     <div className="space-y-3">
       {scope.controls}
@@ -242,23 +230,25 @@ export default function TimelinePage() {
         </p>
       </header>
 
+      <div className="mt-6">
+        <TimelineViewSwitcher current="/timeline" />
+      </div>
+
       <div className="mt-8 grid gap-6 lg:grid-cols-[16rem_1fr]">
         <ScopeRail activeCount={scope.activeCount} onClear={scope.clearAll}>
           {rail}
         </ScopeRail>
 
         <div className="min-w-0">
+          {isDemo && <DemoBanner />}
+
           {loading && <LoadingState rows={3} label="Loading timeline" />}
-          {error && <ErrorState error={error} onRetry={reloadSchools} />}
+          {error && <ErrorState error={error} onRetry={reload} />}
 
           {!loading && !error && grouped.length === 0 && (
-            <EmptyState
-              title="Nothing to plot yet"
-              description={
-                selectedCount === 0
-                  ? 'Select at least one school to see its rounds.'
-                  : 'None of the selected schools have an announced deadline yet.'
-              }
+            <TimelineEmpty
+              hasSelection={selectedCount > 0}
+              anyRowsAtAll={rows.length > 0}
             />
           )}
 

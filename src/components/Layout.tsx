@@ -47,7 +47,9 @@ export function Header() {
               {item.label}
             </NavLink>
           ))}
-        </nav>        <div className="flex items-center gap-2">
+        </nav>
+
+        <div className="flex items-center gap-2">
           <ThemeToggle />
           <Link to="/admin" className="hidden text-sm font-medium text-ink-600 hover:text-ink-900 sm:block">
             Sign in

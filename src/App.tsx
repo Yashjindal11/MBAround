@@ -10,6 +10,8 @@ import SchoolDetailPage from './pages/SchoolDetailPage';
 import SuggestPage from './pages/SuggestPage';
 import ComparePage from './pages/ComparePage';
 import TimelinePage from './pages/TimelinePage';
+import TimelineV2Page from './pages/TimelineV2Page';
+import TimelineV3Page from './pages/TimelineV3Page';
 import { AboutPage, DataSourcesPage, PrivacyPage, TermsPage } from './pages/StaticPages';
 import ComingSoonPage from './pages/ComingSoonPage';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -117,6 +119,10 @@ export default function App() {
                     <Route path="/schools/:slug" element={<SchoolDetailPage />} />
                     <Route path="/compare" element={<ComparePage />} />
                     <Route path="/timeline" element={<TimelinePage />} />
+                    {/* Alternative presentations of identical data. Same
+                        queries, same filters; only the layout differs. */}
+                    <Route path="/timeline/v2" element={<TimelineV2Page />} />
+                    <Route path="/timeline/v3" element={<TimelineV3Page />} />
                     <Route path="/suggest" element={<SuggestPage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/data-sources" element={<DataSourcesPage />} />
