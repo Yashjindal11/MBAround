@@ -137,11 +137,27 @@ Options, if coverage becomes the priority:
 - **Prerendering for social scrapers.** Metadata is client-rendered, so
   Twitter/Slack/LinkedIn previews see the shell. Documented in `docs/SEO.md`.
   Needs prerendering or an edge worker.
-- **`react-refresh` warnings (7).** Files exporting both components and
+- **`react-refresh` warnings (8).** Files exporting both components and
   helpers. Cosmetic; fix by splitting exports if it ever bothers you.
 - **Probe rows in `suggestions`.** `db:verify` inserts one per run and cannot
   delete it (correct RLS). Clear with:
   `delete from suggestions where issue like '[db:verify]%';`
+- **`npm audit` moderate: `react-router` 6.0.0–7.17.0.** Pre-existing and
+  deliberately not bundled into the deploy fix. Fixing it means a router
+  major, which should be its own change with its own test run.
+
+---
+
+## Cloudflare deploy
+
+Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and `VITE_SITE_URL` in
+**Settings → Variables and Secrets** before deploying. Until they are set the
+build now **fails on purpose** — see "Deploying to Cloudflare" in
+`docs/OPERATIONS.md` for why, and for how to read the sitemap line in the
+build log to confirm a deploy actually has data.
+
+Because Vite inlines `VITE_*` at build time, changing a value needs a
+redeploy, not a restart.
 
 ---
 
