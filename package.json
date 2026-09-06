@@ -4,9 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "description": "MBAround — your MBA journey, around every round.",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+  "scripts": {    "dev": "vite",
+    "build": "vite build && tsx scripts/generate-sitemap.ts",
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",

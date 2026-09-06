@@ -1,0 +1,11 @@
+# MBAround — https://mbaround.com
+#
+# The admin CMS is authenticated and database-authorised; it holds nothing of
+# value to crawlers and is excluded to keep it out of search results.
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+
+Sitemap: https://mbaround.com/sitemap.xml
