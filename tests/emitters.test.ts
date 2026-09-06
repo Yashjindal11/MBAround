@@ -107,7 +107,9 @@ describe.each(EMITTERS)('%s emitter', (_label, script) => {
         expect(columns, `${table} insert omits ${col}`).toContain(col);
       }
     }
-  });  it('uses valid enum values where an enum column is set', () => {
+  });
+
+  it('uses valid enum values where an enum column is set', () => {
     const enums: Record<string, string[]> = {};
     const reEnum = /create type ([a-z_]+) as enum \(([^)]*)\)/gi;
     let m: RegExpExecArray | null;
@@ -118,7 +120,9 @@ describe.each(EMITTERS)('%s emitter', (_label, script) => {
     // Every value any enum can hold. A literal that looks like an enum member
     // but belongs to no enum is the bug this catches: 'NEEDS_REVIEW' is a
     // record_status and was being passed to a cycle_status column.
-    const known = new Set(Object.values(enums).flat());    // Only screaming-snake literals are candidates. Single words like 'MBA'
+    const known = new Set(Object.values(enums).flat());
+
+    // Only screaming-snake literals are candidates. Single words like 'MBA'
     // and 'HBS' are ordinary text (short names, programme names) and would
     // produce false positives. An emitter that sets no enum column at all is
     // valid, so an empty candidate list is not a failure.
@@ -136,8 +140,47 @@ describe.each(EMITTERS)('%s emitter', (_label, script) => {
     // collect-deadlines.ts with a source URL, or from a human in the admin UI.
     expect(sql).not.toMatch(/insert\s+into\s+application_rounds/i);
     expect(sql).not.toMatch(/\bdeadline\b/i);
-    expect(sql).not.toMatch(/\bdecision_date\b/i);
-    // A bare ISO date anywhere in a seed would mean a date was invented.
+    expect(sql).not.toMatch(/\bdecision_date\b/i);    // A bare ISO date anywhere in a seed would mean a date was invented.
     expect(sql).not.toMatch(/'\d{4}-\d{2}-\d{2}'/);
+  });
+});
+
+/**
+ * A row that inserts successfully but is invisible to the site is a silent
+ * failure: the SQL editor reports 49 rows, and every public query returns 0.
+ * This caught exactly that - the emitter omitted `status`, the column defaults
+ * to 'DRAFT', and cycles_public_read excludes DRAFT from anon.
+ */
+describe('application cycles visibility', () => {
+  const sql = runEmitter('scripts/data/emit-cycles-sql.ts');
+
+  it('sets status explicitly rather than relying on the DRAFT default', () => {
+    for (const { table, columns } of insertedColumns(sql)) {
+      if (table !== 'application_cycles') continue;
+      expect(columns, 'cycles insert omits status').toContain('status');
+    }
+  });
+
+  it('sets a status the public read policy does not filter out', () => {
+    const policy = SQL.match(
+      /create policy cycles_public_read on application_cycles([\s\S]*?);/i,
+    );
+    expect(policy, 'cycles_public_read policy not found').toBeTruthy();
+
+    // Read the excluded status straight from the policy, so tightening the
+    // policy later fails this test rather than silently hiding the seed.
+    const excluded = policy![1].match(/status\s*<>\s*'([A-Z_]+)'/);
+    expect(excluded, 'policy no longer filters on status').toBeTruthy();
+
+    const inserted = sql.match(/select p\.id,[^\n]*'([A-Z_]+)'/);
+    expect(inserted, 'no status literal in the cycles insert').toBeTruthy();
+    expect(inserted![1]).not.toBe(excluded![1]);
+  });
+
+  it('uses a status that is a real cycle_status value', () => {
+    const e = SQL.match(/create type cycle_status as enum \(([^)]*)\)/i);
+    const values = e![1].split(',').map((s) => s.trim().replace(/'/g, ''));
+    const inserted = sql.match(/select p\.id,[^\n]*'([A-Z_]+)'/);
+    expect(values).toContain(inserted![1]);
   });
 });

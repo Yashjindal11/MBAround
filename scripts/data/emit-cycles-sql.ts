@@ -61,15 +61,21 @@ let n = 0;
 for (const school of schools) {
   for (const program of school.programs) {
     const pslug = slugify(program.name);
+    // status must be set explicitly. The column defaults to 'DRAFT', and the
+    // cycles_public_read RLS policy hides DRAFT rows from anon - so an
+    // otherwise-successful import is invisible to the site and reads as a
+    // failed insert. 'CURRENT' is the cycle_status value that matches
+    // is_current = true.
     out.push(
-      `insert into application_cycles (program_id, cycle_name, start_year, end_year, is_current)\n` +
-        `select p.id, '${CYCLE}', ${START}, ${END}, true\n` +
+      `insert into application_cycles (program_id, cycle_name, start_year, end_year, is_current, status)\n` +
+        `select p.id, '${CYCLE}', ${START}, ${END}, true, 'CURRENT'\n` +
         `from programs p join schools s on s.id = p.school_id\n` +
         `where s.slug = '${school.slug}' and p.slug = '${pslug}'\n` +
         `on conflict (program_id, cycle_name) do update set\n` +
         `  start_year = excluded.start_year,\n` +
         `  end_year = excluded.end_year,\n` +
-        `  is_current = excluded.is_current;`,
+        `  is_current = excluded.is_current,\n` +
+        `  status = excluded.status;`,
     );
     out.push('');
     n++;

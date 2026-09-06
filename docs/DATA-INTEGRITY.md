@@ -118,6 +118,31 @@ paths.
 
 It exits non-zero on violation. Run it after any bulk import.
 
+### 8. RLS makes "inserted" and "visible" different questions
+
+`cycles.sql` was run in the SQL editor and reported success. `npm run db:probe`
+then returned **0 cycles**.
+
+Both were true. The emitter omitted `status`, which defaults to `'DRAFT'`, and
+`cycles_public_read` excludes DRAFT rows from `anon`. 49 rows existed and none
+were readable by the site.
+
+This is a genuinely dangerous failure shape because it is *silent in the
+direction of absence*, and the honest-empty-state design means an empty
+deadlines page looks intentional. The reverse — rows visible that should not be
+— would be caught by a human noticing wrong content. This would not.
+
+The lesson generalises: **the SQL editor runs as a privileged role, so a
+successful insert says nothing about whether the site can read the row.**
+Anything that writes rows the public must see has to set the columns the read
+policy filters on, explicitly, and never rely on a column default.
+
+Verified after every import by `npm run db:probe`, which reads through the anon
+key precisely so that it sees what a visitor sees. `tests/emitters.test.ts`
+asserts the cycles emitter sets `status`, and reads the excluded value out of
+the policy text so that tightening the policy later fails the test rather than
+silently hiding the seed.
+
 ## Verification states
 
 | State | `is_announced` | `deadline` | `is_verified` | Shown as |
