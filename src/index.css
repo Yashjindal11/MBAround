@@ -3,9 +3,83 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Light theme. Values are raw "R G B" channels because Tailwind composes
+   * them with an alpha channel; hex would break opacity modifiers.
+   */
   :root {
     color-scheme: light;
+
+    --ink-50: 246 247 248;
+    --ink-100: 236 238 241;
+    --ink-200: 213 218 225;
+    --ink-300: 176 186 199;
+    --ink-400: 133 147 167;
+    --ink-500: 102 116 139;
+    --ink-600: 81 93 114;
+    --ink-700: 67 76 93;
+    --ink-800: 58 65 79;
+    --ink-900: 15 19 25;
+    --ink-950: 8 10 14;
+
+    --accent-50: 238 247 244;
+    --accent-100: 213 236 228;
+    --accent-200: 173 218 205;
+    --accent-300: 124 193 174;
+    --accent-400: 78 162 141;
+    --accent-500: 50 133 116;
+    --accent-600: 34 107 94;
+    --accent-700: 28 85 76;
+    --accent-800: 25 68 62;
+    --accent-900: 21 57 53;
+
+    --sand: 250 249 247;
+    --surface: 255 255 255;
   }
+
+  /*
+   * Dark theme. The ink scale is INVERTED rather than replaced: ink-900 stays
+   * "the strongest text colour" and ink-50 stays "the faintest wash", so every
+   * existing utility keeps its meaning and contrast relationships survive.
+   *
+   * Greys carry a slight blue cast and the canvas is #12151a rather than pure
+   * black - true black against light text causes halation, and this is a
+   * product people read long lists of dates on.
+   *
+   * The accent is lightened, not merely flipped: the light-mode green (#328574)
+   * fails WCAG AA on a dark canvas, so dark mode uses the lighter end of the
+   * ramp for text and borders.
+   */
+  .dark {
+    color-scheme: dark;
+
+    --ink-50: 30 35 43;
+    --ink-100: 38 44 54;
+    --ink-200: 51 59 71;
+    --ink-300: 74 85 101;
+    --ink-400: 113 127 147;
+    --ink-500: 148 161 179;
+    --ink-600: 178 189 203;
+    --ink-700: 203 212 223;
+    --ink-800: 226 232 240;
+    --ink-900: 240 244 248;
+    --ink-950: 250 252 254;
+
+    --accent-50: 19 42 38;
+    --accent-100: 25 58 51;
+    --accent-200: 30 79 69;
+    --accent-300: 42 108 94;
+    --accent-400: 62 145 126;
+    --accent-500: 90 180 158;
+    --accent-600: 124 203 182;
+    --accent-700: 158 219 202;
+    --accent-800: 190 233 221;
+    --accent-900: 222 245 238;
+
+    --sand: 18 21 26;
+    --surface: 26 30 37;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

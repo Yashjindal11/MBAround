@@ -1,36 +1,47 @@
 /** @type {import('tailwindcss').Config} */
+
+/**
+ * Colours resolve through CSS variables holding raw RGB channels, so a single
+ * `.dark` class on <html> re-themes the whole product. The alternative -
+ * adding `dark:` variants beside ~240 existing colour classes - would mean
+ * every future component could silently forget one and break only in dark
+ * mode. Here there is nothing to forget: `bg-white` and `text-ink-900` are
+ * already theme-aware.
+ *
+ * The <alpha-value> placeholder keeps opacity modifiers (`border-ink-200/70`)
+ * working, which plain `var(--x)` colours would otherwise break.
+ */
+const withAlpha = (v) => `rgb(var(${v}) / <alpha-value>)`;
+
+const inkScale = Object.fromEntries(
+  [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((n) => [
+    n,
+    withAlpha(`--ink-${n}`),
+  ]),
+);
+const accentScale = Object.fromEntries(
+  [50, 100, 200, 300, 400, 500, 600, 700, 800, 900].map((n) => [
+    n,
+    withAlpha(`--accent-${n}`),
+  ]),
+);
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        ink: {
-          50: '#f6f7f8',
-          100: '#eceef1',
-          200: '#d5dae1',
-          300: '#b0bac7',
-          400: '#8593a7',
-          500: '#66748b',
-          600: '#515d72',
-          700: '#434c5d',
-          800: '#3a414f',
-          900: '#0f1319',
-          950: '#080a0e',
-        },
-        accent: {
-          50: '#eef7f4',
-          100: '#d5ece4',
-          200: '#addacd',
-          300: '#7cc1ae',
-          400: '#4ea28d',
-          500: '#328574',
-          600: '#226b5e',
-          700: '#1c554c',
-          800: '#19443e',
-          900: '#153935',
-        },
-        sand: '#faf9f7',
-      },      fontFamily: {
+        ink: inkScale,
+        accent: accentScale,
+        sand: withAlpha('--sand'),
+        // Overridden deliberately: `bg-white` reads as "the raised surface
+        // colour" throughout this codebase, which in dark mode is a light
+        // panel, not #fff.
+        white: withAlpha('--surface'),
+        canvas: withAlpha('--sand'),
+      },
+fontFamily: {
         sans: ['Inter var', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         display: ['Source Serif 4', 'Charter', 'Georgia', 'serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],

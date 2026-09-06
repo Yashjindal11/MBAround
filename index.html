@@ -1,10 +1,32 @@
 <!doctype html>
 <html lang="en">
-  <head>    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <head>    <meta charset="UTF-8" />    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
-    <meta name="theme-color" content="#0f1319" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf9f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#12151a" />
+    <!--
+      Runs before first paint so a dark-mode user never sees a white flash.
+      Inlined and synchronous on purpose: a deferred module would execute after
+      the browser has already painted, which is the whole problem. Kept in sync
+      with src/lib/theme.tsx (same storage key, same `.dark` class).
+    -->
+    <script>
+      (function () {
+        try {
+          var p = localStorage.getItem('mbaround:theme');
+          if (p !== 'light' && p !== 'dark') p = 'system';
+          var dark =
+            p === 'dark' ||
+            (p === 'system' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {
+          /* Storage blocked; fall through to the light default. */
+        }
+      })();
+    </script>
     <title>MBAround — Your MBA journey, around every round.</title>
     <meta
       name="description"
