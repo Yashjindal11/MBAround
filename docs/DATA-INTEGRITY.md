@@ -143,6 +143,38 @@ asserts the cycles emitter sets `status`, and reads the excluded value out of
 the policy text so that tightening the policy later fails the test rather than
 silently hiding the seed.
 
+### 9. Triggers are shared code across differently-shaped tables
+
+`log_audit_event()` fires on `schools`, `programs`, `application_cycles` and
+`application_rounds`. It dereferenced `old.is_published` — a column only the
+first two have — behind what looked like a guard:
+
+```sql
+if to_jsonb(old) ? 'is_published'
+   and (old.is_published is distinct from new.is_published) then
+```
+
+The guard does nothing. PL/pgSQL passes the whole boolean expression to the SQL
+parser as one unit and resolves `old` against the real record type, so there is
+no short-circuit protecting the second operand. On a cycle or round it raises
+`42703: record "old" has no field "is_published"` rather than evaluating false.
+
+It stayed hidden for a reason worth noting: `INSERT` and `DELETE` never reach
+that branch, so the first run of `cycles.sql` was fine. The failure needed an
+`UPDATE` on a cycle, which only happened on the *second* run, when
+`on conflict ... do update` finally fired. The trigger is `AFTER`, so it
+aborted the transaction and rolled the entire seed back.
+
+Fixed in `0005` by reading the flag out of the jsonb snapshots
+(`v_before -> 'is_published'`), which have no per-table shape, so the same code
+is valid everywhere and the record is never dereferenced by name.
+
+The general rule: **a trigger function attached to several tables may only
+touch columns all of them have.** Anything table-specific goes through
+`to_jsonb`. `tests/migrations.test.ts` enforces this by extracting every
+`old.`/`new.` field access from the function body and checking it against the
+declared columns of every table that triggers it.
+
 ## Verification states
 
 | State | `is_announced` | `deadline` | `is_verified` | Shown as |
