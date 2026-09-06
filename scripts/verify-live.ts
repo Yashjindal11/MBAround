@@ -110,13 +110,19 @@ async function main() {
   });
   check('anon cannot insert schools', write.status === 401 || write.status === 403,
     `HTTP ${write.status}`);
-
   // 7. Suggestions are the one public write, and must stay open or the
   //    correction path is dead.
+  //
+  //    This leaves a real row behind. Anon can neither read nor delete it
+  //    (check 8 is that same policy from the other side), so the probe cannot
+  //    clean up after itself. The marker makes the rows findable:
+  //
+  //      delete from suggestions where issue like '[db:verify]%';
   const suggest = await fetch(`${URL_}/rest/v1/suggestions`, {
     method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },    body: JSON.stringify({
-      issue: 'automated liveness probe — ignore',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      issue: `[db:verify] automated liveness probe ${new Date().toISOString()} — safe to delete`,
       source_url: 'https://example.com',
     }),
   });
@@ -125,6 +131,51 @@ async function main() {
   // 8. Submitted suggestions must not be readable back by the public.
   const readBack = await get<unknown[]>('suggestions?select=id');
   check('anon cannot read suggestions back', readBack.length === 0);
+
+  // 9. Cycles must be readable by anon. This is the check that would have
+  //    caught the DRAFT seed: 49 rows existed and none were visible, which
+  //    looks identical to "no data yet" from the UI.
+  const cycles = await get<{ id: string; status: string; cycle_name: string }[]>(
+    'application_cycles?select=id,status,cycle_name',
+  );
+  check('anon can read application cycles', cycles.length > 0, `${cycles.length} rows`);
+
+  // 10. Every published programme needs a cycle, or its school page has no
+  //     container to hang rounds off and can never show a deadline.
+  const programmes = await get<{ id: string }[]>(
+    'programs?select=id&is_published=eq.true',
+  );
+  check(
+    'every published programme has a cycle',
+    cycles.length >= programmes.length,
+    `${cycles.length} cycles / ${programmes.length} programmes`,
+  );
+
+  // 11. A cycle visible to anon cannot be DRAFT - the read policy excludes
+  //     DRAFT, so seeing one here would mean the policy had been loosened.
+  check(
+    'no DRAFT cycle is publicly visible',
+    cycles.every((c) => c.status !== 'DRAFT'),
+  );
+
+  // 12. Rounds are the table that carries dates. Anonymous write access here
+  //     would let anyone publish a deadline, which is the worst case this
+  //     project has.
+  const roundWrite = await fetch(`${URL_}/rest/v1/application_rounds`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      application_cycle_id: cycles[0]?.id ?? '00000000-0000-0000-0000-000000000000',
+      name: 'rls-probe',
+      display_order: 99,
+      is_announced: false,
+    }),
+  });
+  check(
+    'anon cannot insert application rounds',
+    roundWrite.status === 401 || roundWrite.status === 403,
+    `HTTP ${roundWrite.status}`,
+  );
 
   console.log(
     failures === 0

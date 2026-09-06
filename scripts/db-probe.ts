@@ -45,19 +45,29 @@ async function count(table: string): Promise<string> {
   return range.split('/')[1] ?? '?';
 }
 
-const TABLES = [
-  'schools',
-  'programs',
-  'application_cycles',
-  'application_rounds',
-  'suggestions',
-  'deadline_rows',
+/**
+ * Tables counted through the anon key.
+ *
+ * `writeOnly` marks a table anon may insert into but not read. Its count is
+ * always 0 no matter how many rows exist, so reporting a bare "0" would read
+ * as "empty" when it means "invisible" - the same confusion that made 49 DRAFT
+ * cycles look like a failed import.
+ */
+const TABLES: { name: string; writeOnly?: boolean }[] = [
+  { name: 'schools' },
+  { name: 'programs' },
+  { name: 'application_cycles' },
+  { name: 'application_rounds' },
+  { name: 'suggestions', writeOnly: true },
+  { name: 'deadline_rows' },
 ];
 
 async function main() {
   console.log(`Supabase: ${URL_}\n`);
   for (const t of TABLES) {
-    console.log(`  ${t.padEnd(20)} ${await count(t)}`);
+    const n = await count(t.name);
+    const note = t.writeOnly ? '  (write-only for anon; count not meaningful)' : '';
+    console.log(`  ${t.name.padEnd(20)} ${n}${note}`);
   }
 
   // Any round that is announced must carry a date, and any round carrying a
