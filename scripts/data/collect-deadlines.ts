@@ -222,21 +222,37 @@ async function main() {
 
     for (const program of school.programs) {
       out.push(`-- ${school.name} / ${program.name}`);
-      out.push(`insert into application_cycles (program_id, cycle_name, start_year, is_current, status)`);
-      out.push(`select p.id, ${lit(cycleName)}, ${startYear}, true, 'NEEDS_REVIEW'`);
+      // end_year is NOT NULL with no default, and 'CURRENT' is a cycle_status
+      // value — an earlier version omitted the former and passed 'NEEDS_REVIEW'
+      // (a record_status), so every generated statement would have aborted.
+      out.push(
+        `insert into application_cycles (program_id, cycle_name, start_year, end_year, is_current, status)`,
+      );
+      out.push(
+        `select p.id, ${lit(cycleName)}, ${startYear}, ${startYear + 1}, true, 'CURRENT'`,
+      );
       out.push(`from programs p join schools s on s.id = p.school_id`);
       out.push(`where s.slug = ${lit(school.slug)} and p.name = ${lit(program.name)}`);
-      out.push(`on conflict do nothing;`);
+      // The real conflict target: re-running must update, not silently skip.
+      out.push(`on conflict (program_id, cycle_name) do nothing;`);
       out.push('');
 
       for (const [i, r] of rounds.entries()) {
-        out.push(`insert into application_rounds (cycle_id, round_name, round_order, deadline, is_announced, is_verified, source_url, status)`);
-        out.push(`select c.id, ${lit(r.roundName)}, ${i + 1}, ${lit(r.deadline)}, true, false, ${lit(r.sourceUrl)}, 'NEEDS_REVIEW'`);
+        // Column names must match migration 0001 exactly: the table uses
+        // application_cycle_id / name / display_order, and has no status
+        // column. An earlier version invented cycle_id / round_name /
+        // round_order and would have failed on every insert.
+        out.push(
+          `insert into application_rounds (application_cycle_id, name, display_order, deadline, is_announced, is_verified, source_url)`,
+        );
+        out.push(
+          `select c.id, ${lit(r.roundName)}, ${i + 1}, ${lit(r.deadline)}, true, false, ${lit(r.sourceUrl)}`,
+        );
         out.push(`from application_cycles c`);
         out.push(`join programs p on p.id = c.program_id`);
         out.push(`join schools s on s.id = p.school_id`);
         out.push(`where s.slug = ${lit(school.slug)} and p.name = ${lit(program.name)} and c.cycle_name = ${lit(cycleName)}`);
-        out.push(`on conflict do nothing;`);
+        out.push(`on conflict (application_cycle_id, name) do nothing;`);
         out.push('');
       }
     }
