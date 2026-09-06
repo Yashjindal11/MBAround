@@ -5,6 +5,7 @@ import { getDeadlines, getSchools } from '../lib/queries/public';
 import { compareRounds, formatDateShort } from '../lib/dates';
 import { EmptyState } from '../components/States';
 import { VerificationBadge } from '../components/VerificationBadge';
+import { ScopeRail, useSchoolScope } from '../components/SchoolScope';
 import { verificationState } from '../lib/dates';
 import type { DeadlineRow, School } from '../lib/types';
 
@@ -19,13 +20,18 @@ export default function ComparePage() {
   const [params, setParams] = useSearchParams();
   const initial = params.get('schools')?.split(',').filter(Boolean) ?? [];
   const [slugs, setSlugs] = useState<string[]>(initial);
-
   const { data: schools } = useAsync(() => getSchools(), []);
   const { data: rows } = useAsync(() => getDeadlines({ includePast: true }), []);
 
+  const allSchools = useMemo<School[]>(() => schools ?? [], [schools]);
+  const allRows = useMemo<DeadlineRow[]>(() => rows ?? [], [rows]);
+
+  /** Region / country / programme facets, shared with the timeline page. */
+  const scope = useSchoolScope(allSchools, allRows);
+
   const selected = useMemo(
-    () => (schools ?? []).filter((s) => slugs.includes(s.slug)),
-    [schools, slugs],
+    () => allSchools.filter((s) => slugs.includes(s.slug)),
+    [allSchools, slugs],
   );
 
   const update = (next: string[]) => {
@@ -52,42 +58,81 @@ export default function ComparePage() {
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-600">
           Choose up to {MAX} schools to compare their programmes, application
-          rounds and decision dates.
+          rounds and decision dates. Narrow the list on the left by region,
+          country or programme.
         </p>
       </header>
 
-      <div className="surface mt-8 p-5">
-        <p className="label-caps mb-3">Select schools ({slugs.length}/{MAX})</p>
-        <div className="flex flex-wrap gap-2">
-          {(schools ?? []).map((s) => {
-            const on = slugs.includes(s.slug);
-            return (
-              <button
-                key={s.id}
-                onClick={() => toggle(s.slug)}
-                disabled={!on && slugs.length >= MAX}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
-                  on
-                    ? 'border-ink-900 bg-ink-900 text-white'
-                    : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400'
-                }`}
-              >
-                {s.shortName ?? s.name}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <div className="mt-8 grid gap-6 lg:grid-cols-[16rem_1fr]">
+        <ScopeRail activeCount={scope.activeCount} onClear={scope.clearAll}>
+          <div className="space-y-3">
+            {scope.controls}
 
-      <div className="mt-8">
-        {selected.length === 0 ? (
-          <EmptyState
-            title="Nothing selected yet"
-            description="Pick two or more schools above to see them side by side."
-          />
-        ) : (
-          <CompareTable schools={selected} rows={rows ?? []} />
-        )}
+            <div className="border-t border-ink-100 pt-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <h3 className="label-caps">Schools</h3>
+                <span className="text-2xs text-ink-500">
+                  {slugs.length}/{MAX} selected
+                </span>
+              </div>
+
+              {slugs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => update([])}
+                  className="mt-2 text-2xs font-medium text-accent-700 hover:underline"
+                >
+                  Clear selection
+                </button>
+              )}
+
+              <div className="mt-2 max-h-[24rem] space-y-0.5 overflow-y-auto pr-1">
+                {scope.schools.length === 0 ? (
+                  <p className="py-2 text-2xs text-ink-500">
+                    No schools match these filters.
+                  </p>
+                ) : (
+                  scope.schools.map((s) => {
+                    const on = slugs.includes(s.slug);
+                    const atLimit = !on && slugs.length >= MAX;
+                    return (
+                      <label
+                        key={s.id}
+                        className={
+                          'flex items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm ' +
+                          (atLimit
+                            ? 'cursor-not-allowed text-ink-400'
+                            : 'cursor-pointer text-ink-700 hover:bg-ink-50')
+                        }
+                        title={atLimit ? 'Deselect a school first' : s.name}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          disabled={atLimit}
+                          onChange={() => toggle(s.slug)}
+                          className="h-3.5 w-3.5 shrink-0 rounded border-ink-300 text-accent-600 focus:ring-accent-500 disabled:opacity-40"
+                        />
+                        <span className="truncate">{s.shortName ?? s.name}</span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </ScopeRail>
+
+        <div className="min-w-0">
+          {selected.length === 0 ? (
+            <EmptyState
+              title="Nothing selected yet"
+              description="Pick two or more schools from the list to see them side by side."
+            />
+          ) : (
+            <CompareTable schools={selected} rows={allRows} />
+          )}
+        </div>
       </div>
     </div>
   );

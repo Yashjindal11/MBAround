@@ -8,9 +8,9 @@ import {
   parseDate,
   verificationState,
 } from '../lib/dates';
-import { EmptyState,         ErrorState, LoadingState } from '../components/States';
+import { EmptyState, ErrorState, LoadingState } from '../components/States';
 import { VerificationBadge } from '../components/VerificationBadge';
-import { SearchInput } from '../components/Filters';
+import { ScopeRail, useSchoolScope } from '../components/SchoolScope';
 import type { DeadlineRow, School } from '../lib/types';
 
 /**
@@ -23,7 +23,6 @@ import type { DeadlineRow, School } from '../lib/types';
  */
 export default function TimelinePage() {
   const [deselected, setDeselected] = useState<string[]>([]);
-  const [query, setQuery] = useState('');
 
   const {
     data: schools,
@@ -38,6 +37,10 @@ export default function TimelinePage() {
   } = useAsync(() => getDeadlines({ includePast: true }), []);
 
   const allSchools = useMemo<School[]>(() => schools ?? [], [schools]);
+  const allRows = useMemo<DeadlineRow[]>(() => rows ?? [], [rows]);
+
+  /** Region / country / programme facets, shared with the compare page. */
+  const scope = useSchoolScope(allSchools, allRows);
 
   const isSelected = (slug: string) => !deselected.includes(slug);
 
@@ -46,28 +49,26 @@ export default function TimelinePage() {
       prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug],
     );
 
-  const selectAll = () => setDeselected([]);
-  const selectNone = () => setDeselected(allSchools.map((s) => s.slug));
+  /**
+   * Only schools surviving the facets are eligible, and within those every
+   * school is on unless explicitly unticked.
+   */
+  const railSchools = scope.schools;
+  const selectedCount = railSchools.filter((s) => isSelected(s.slug)).length;
 
-  const selectedCount = allSchools.length - deselected.length;
-
-  /** Schools shown in the rail, narrowed by the rail's own search box. */
-  const railSchools = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return allSchools;
-    return allSchools.filter((s) =>
-      [s.name, s.shortName, s.city, s.country]
-        .filter((v): v is string => Boolean(v))
-        .some((v) => v.toLowerCase().includes(q)),
-    );
-  }, [allSchools, query]);
+  const selectAll = () =>
+    setDeselected((prev) => prev.filter((slug) => !railSchools.some((s) => s.slug === slug)));
+  const selectNone = () =>
+    setDeselected((prev) => [
+      ...new Set([...prev, ...railSchools.map((s) => s.slug)]),
+    ]);
 
   const selectedIds = useMemo(
     () =>
       new Set(
-        allSchools.filter((s) => !deselected.includes(s.slug)).map((s) => s.id),
+        railSchools.filter((s) => !deselected.includes(s.slug)).map((s) => s.id),
       ),
-    [allSchools, deselected],
+    [railSchools, deselected],
   );
 
   const inScope = useMemo(
@@ -153,55 +154,59 @@ export default function TimelinePage() {
 
   const rail = (
     <div className="space-y-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-ink-900">Schools</h2>
-        <span className="text-2xs text-ink-500">
-          {selectedCount} of {allSchools.length}
-        </span>
-      </div>
+      {scope.controls}
 
-      <SearchInput value={query} onChange={setQuery} placeholder="Find a school" />
+      <div className="border-t border-ink-100 pt-4">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="label-caps">Schools</h3>
+          <span className="text-2xs text-ink-500">
+            {selectedCount} of {railSchools.length}
+          </span>
+        </div>
 
-      <div className="flex gap-3 border-b border-ink-100 pb-3">
-        <button
-          type="button"
-          onClick={selectAll}
-          disabled={deselected.length === 0}
-          className="text-2xs font-medium text-accent-700 hover:underline disabled:cursor-default disabled:text-ink-300 disabled:no-underline"
-        >
-          Select all
-        </button>
-        <button
-          type="button"
-          onClick={selectNone}
-          disabled={selectedCount === 0}
-          className="text-2xs font-medium text-accent-700 hover:underline disabled:cursor-default disabled:text-ink-300 disabled:no-underline"
-        >
-          Clear
-        </button>
-      </div>
+        <div className="mt-2 flex gap-3 border-b border-ink-100 pb-3">
+          <button
+            type="button"
+            onClick={selectAll}
+            disabled={selectedCount === railSchools.length}
+            className="text-2xs font-medium text-accent-700 hover:underline disabled:cursor-default disabled:text-ink-300 disabled:no-underline"
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            onClick={selectNone}
+            disabled={selectedCount === 0}
+            className="text-2xs font-medium text-accent-700 hover:underline disabled:cursor-default disabled:text-ink-300 disabled:no-underline"
+          >
+            Clear
+          </button>
+        </div>
 
-      <div className="max-h-[26rem] space-y-0.5 overflow-y-auto pr-1">
-        {railSchools.length === 0 ? (
-          <p className="py-2 text-2xs text-ink-500">No schools match that search.</p>
-        ) : (
-          railSchools.map((s) => (
-            <label
-              key={s.id}
-              className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm text-ink-700 hover:bg-ink-50"
-            >
-              <input
-                type="checkbox"
-                checked={isSelected(s.slug)}
-                onChange={() => toggle(s.slug)}
-                className="h-3.5 w-3.5 shrink-0 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
-              />
-              <span className="truncate" title={s.name}>
-                {s.shortName ?? s.name}
-              </span>
-            </label>
-          ))
-        )}
+        <div className="mt-2 max-h-[22rem] space-y-0.5 overflow-y-auto pr-1">
+          {railSchools.length === 0 ? (
+            <p className="py-2 text-2xs text-ink-500">
+              No schools match these filters.
+            </p>
+          ) : (
+            railSchools.map((s) => (
+              <label
+                key={s.id}
+                className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm text-ink-700 hover:bg-ink-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected(s.slug)}
+                  onChange={() => toggle(s.slug)}
+                  className="h-3.5 w-3.5 shrink-0 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                />
+                <span className="truncate" title={s.name}>
+                  {s.shortName ?? s.name}
+                </span>
+              </label>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
@@ -221,20 +226,9 @@ export default function TimelinePage() {
       </header>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[16rem_1fr]">
-        {/* Desktop rail */}
-        <aside className="hidden lg:block">
-          <div className="surface sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto p-5">
-            {rail}
-          </div>
-        </aside>
-
-        {/* Mobile: same controls, collapsed above the chart */}
-        <details className="surface p-5 lg:hidden">
-          <summary className="cursor-pointer text-sm font-semibold text-ink-900">
-            Schools ({selectedCount} of {allSchools.length})
-          </summary>
-          <div className="mt-4">{rail}</div>
-        </details>
+        <ScopeRail activeCount={scope.activeCount} onClear={scope.clearAll}>
+          {rail}
+        </ScopeRail>
 
         <div className="min-w-0">
           {loading && <LoadingState rows={3} label="Loading timeline" />}
