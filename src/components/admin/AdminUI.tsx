@@ -103,9 +103,14 @@ export function InlineEditor({
   const [draft, setDraft] = useState(value ?? '');
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => setDraft(value ?? ''), [value]);
-  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  // Block bodies: a concise arrow returns its expression's value, which React
+  // would misinterpret as an effect cleanup function.
+  useEffect(() => {
+    setDraft(value ?? '');
+  }, [value]);
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
 
   const commit = async () => {
     const nextValue = draft.trim() === '' ? null : draft.trim();

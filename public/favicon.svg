@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="MBAround">
+  <!-- Concentric "rounds" motif on the brand ink background. -->
+  <rect width="32" height="32" rx="7" fill="#0f1319" />
+  <circle cx="16" cy="16" r="10.5" fill="none" stroke="#226b5e" stroke-width="1.5" />
+  <circle cx="16" cy="16" r="6.75" fill="none" stroke="#4ea28d" stroke-width="1.5" />
+  <circle cx="16" cy="16" r="3" fill="#7cc1ae" />
+</svg>

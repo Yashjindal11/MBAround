@@ -23,7 +23,11 @@ import AdminAudit from './pages/admin/AdminAudit';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // A block body is required: a concise arrow would return the result of
+  // `window.scrollTo`, which React would then treat as a cleanup function.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return null;
 }
 
