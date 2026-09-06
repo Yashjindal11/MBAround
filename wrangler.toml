@@ -1,0 +1,18 @@
+name = "mbaround"
+compatibility_date = "2026-09-06"
+
+# MBAround is a pure static SPA: all data is read from Supabase in the browser
+# through the anon key, with row-level security deciding what is public. There
+# is no server-side code, so there is no `main` Worker entrypoint - only the
+# Vite build output served as assets.
+#
+# Wrangler's automatic framework detection refused to deploy without this file,
+# because it only auto-configures Vite 6 and above. Declaring the assets
+# directory explicitly makes the deploy independent of that detection.
+[assets]
+directory = "./dist"
+
+# Deep links must resolve. Without this, /schools/harvard-business-school is a
+# 404 on hard refresh or when a search engine crawls it - the client router
+# only exists once index.html has loaded.
+not_found_handling = "single-page-application"

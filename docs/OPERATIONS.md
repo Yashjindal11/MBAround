@@ -212,11 +212,79 @@ constraints, not application logic, so no client can bypass them.
 
 ```powershell
 npx tsc --noEmit     # 0 errors
-npx vitest run       # 112 tests
-npx eslint .         # 0 errors (7 react-refresh warnings are expected)
+npx vitest run       # 128 tests across 11 files
+npx eslint .         # 0 errors (8 react-refresh warnings are expected)
 npm run build        # also regenerates the sitemap
 npm run db:verify    # the data the pages describe is really there
 ```
 
 The build regenerates `sitemap.xml` from the database, so a school added
 without a rebuild is absent from it.
+
+## Deploying to Cloudflare
+
+### Required environment variables
+
+Set both in the Cloudflare dashboard under **Settings → Variables and
+Secrets**, for the Production environment:
+
+| Variable | Value |
+| --- | --- |
+| `VITE_SUPABASE_URL` | `https://wcrlkdeettpmamlgmpcv.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | the publishable key from Supabase → Settings → API |
+| `VITE_SITE_URL` | the live origin, e.g. `https://mbaround.com` |
+
+These are read at *build* time, not run time. Vite inlines `VITE_*` values
+into the bundle, so **changing them requires a redeploy**, not just a restart.
+
+`VITE_SITE_URL` only affects canonical URLs and `sitemap.xml`. If it is
+wrong, the site works but tells search engines the wrong address.
+
+### Why the build fails without them
+
+A previous deploy succeeded with no credentials set. The bundle built, and
+the only sign of trouble was one line amid normal output:
+
+```
+[sitemap] Supabase not configured — emitting static routes only.
+```
+
+That would have published a live site whose every data-bearing page —
+schools, deadlines, compare, timeline, and all filters — rendered its empty
+state. MBAround has no static content worth serving, so a build that cannot
+reach the database has no useful output at all.
+
+`scripts/generate-sitemap.ts` now exits non-zero in that situation. It treats
+a build as production when `CF_PAGES_BRANCH` or `WORKERS_CI_BRANCH` is
+`main`/`master`, or when `CI=true`, or `NODE_ENV=production`. A local
+`npm run build` matches none of these and keeps the lenient behaviour, so
+working offline is unaffected. Preview branches also stay lenient.
+
+The same hard failure applies when credentials *are* set but the query fails
+— an expired key or a paused project produces an equally empty site.
+
+To build without a database deliberately, set
+`MBAROUND_ALLOW_UNCONFIGURED_BUILD=true`.
+
+`tests/build-guard.test.ts` covers each of these branches by spawning the
+real script, so the guard cannot regress silently.
+
+### Verifying a deploy actually has data
+
+Read the build log for the sitemap line. It must name a school count:
+
+```
+[sitemap] Wrote 56 URLs (10 static, 46 schools).
+```
+
+`10 static, 0 schools` means the site is empty even if the deploy is green.
+
+### wrangler.toml
+
+`wrangler.toml` serves `./dist` as static assets with
+`not_found_handling = "single-page-application"`, so client-side routes such
+as `/schools/harvard` resolve instead of 404ing on refresh.
+
+Wrangler's automatic Vite configuration requires Vite ≥ 6, which is why the
+project runs Vite 6 (`@vitejs/plugin-react` 5.x — the 6.x line requires Vite
+8) and Vitest 3.

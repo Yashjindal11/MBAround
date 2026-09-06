@@ -3,12 +3,16 @@
  *
  * School URLs are read from Supabase at build time rather than hardcoded, so
  * publishing a school in the admin panel puts it in the sitemap on the next
- * deploy with no code change. If credentials are absent the script still emits
- * a valid sitemap containing the static routes and exits successfully, so a
- * preview build never fails for want of a database.
+ * deploy with no code change.
  *
  * Only published schools are included — the anon key is used deliberately so
  * that row-level security, not this script, decides what is public.
+ *
+ * Missing credentials are tolerated in a local or preview build and are a hard
+ * failure in a production one. Without Supabase the site renders no schools,
+ * no deadlines and no filters at all: shipping that to a live domain is worse
+ * than shipping nothing, because it looks like a working site that simply has
+ * no data. See `assertProductionCredentials`.
  */
 import { createClient } from '@supabase/supabase-js';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -17,6 +21,47 @@ import 'dotenv/config';
 
 const SITE_URL = (process.env.VITE_SITE_URL ?? 'https://mbaround.com').replace(/\/$/, '');
 const OUT_DIR = path.resolve(process.cwd(), 'dist');
+
+/**
+ * True when this build's output is destined for a real domain.
+ *
+ * Cloudflare sets CF_PAGES_BRANCH / WORKERS_CI_BRANCH on its build machines;
+ * CI is set by nearly every provider. A developer running `npm run build`
+ * locally matches none of these and keeps the lenient behaviour.
+ */
+function isProductionBuild(): boolean {
+  if (process.env.MBAROUND_ALLOW_UNCONFIGURED_BUILD === 'true') return false;
+  const branch = process.env.CF_PAGES_BRANCH ?? process.env.WORKERS_CI_BRANCH;
+  if (branch) return branch === 'main' || branch === 'master';
+  return process.env.CI === 'true' || process.env.NODE_ENV === 'production';
+}
+
+/**
+ * Refuses to produce a production build that cannot reach the database.
+ *
+ * This exists because a deploy did exactly that and reported success: the
+ * bundle built, the sitemap emitted 10 static URLs, and the result would have
+ * been a live site whose every data-bearing page was empty. A build that
+ * cannot fail for this reason cannot warn about it either — the only log line
+ * was one `console.warn` amid normal output.
+ */
+function assertProductionCredentials(configured: boolean): void {
+  if (configured || !isProductionBuild()) return;
+  console.error(
+    '\n[sitemap] REFUSING TO BUILD: Supabase credentials are missing.\n' +
+      '\n' +
+      '  This looks like a production build, and without VITE_SUPABASE_URL and\n' +
+      '  VITE_SUPABASE_ANON_KEY the deployed site shows no schools, no deadlines\n' +
+      '  and no filters — every page renders its empty state.\n' +
+      '\n' +
+      '  Set both variables in the Cloudflare dashboard under\n' +
+      '  Settings -> Variables and Secrets, then redeploy.\n' +
+      '\n' +
+      '  To build without a database on purpose, set\n' +
+      '  MBAROUND_ALLOW_UNCONFIGURED_BUILD=true.\n',
+  );
+  process.exit(1);
+}
 
 /** Routes that always exist, with relative priorities for crawl budgeting. */
 const STATIC_ROUTES: ReadonlyArray<{ path: string; priority: string; changefreq: string }> = [
@@ -46,8 +91,8 @@ type SchoolEntry = { slug: string; updatedAt: string | null };
 async function fetchPublishedSchools(): Promise<SchoolEntry[]> {
   const url = process.env.VITE_SUPABASE_URL;
   const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
-
   if (!url || !anonKey || url.includes('your-project-ref')) {
+    assertProductionCredentials(false);
     console.warn(
       '[sitemap] Supabase not configured — emitting static routes only.',
     );
@@ -63,9 +108,18 @@ async function fetchPublishedSchools(): Promise<SchoolEntry[]> {
     .select('slug, updated_at')
     .eq('is_published', true)
     .order('slug');
-
   if (error) {
-    // A build should not fail because the sitemap could not be enriched.
+    // Credentials present but the database is unreachable or RLS refused the
+    // read. The deployed site would be just as empty as with no credentials at
+    // all, so production is held to the same standard.
+    if (isProductionBuild()) {
+      console.error(
+        `\n[sitemap] REFUSING TO BUILD: could not read schools — ${error.message}\n` +
+          '\n  Credentials are set but the query failed. Check the project is\n' +
+          '  running and that the anon key is current.\n',
+      );
+      process.exit(1);
+    }
     console.warn(`[sitemap] Could not read schools: ${error.message}`);
     return [];
   }
