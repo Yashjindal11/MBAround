@@ -9,9 +9,18 @@ interface AuthState {
   role: AdminRole | null;
   loading: boolean;
   /** True only when the DB confirms a row in `admin_users`. */
-  isEditor: boolean;
-  isAdmin: boolean;
-  isSuperAdmin: boolean;  signInWithGoogle: () => Promise<void>;
+  isEditor: boolean;  isAdmin: boolean;
+  isSuperAdmin: boolean;
+  /**
+   * Whether the Google provider is actually enabled on the Supabase project.
+   *
+   * Null while unknown. Offering a button that redirects straight to
+   * "Unsupported provider: provider is not enabled" is worse than not offering
+   * it, because the failure looks like a bug in the app rather than a setting
+   * that was never switched on.
+   */
+  googleEnabled: boolean | null;
+  signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string) => Promise<void>;
   /**
    * Password sign-in. Sends no email, so it is unaffected by the project-wide
@@ -24,10 +33,30 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {  const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AdminRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [googleEnabled, setGoogleEnabled] = useState<boolean | null>(null);
+
+  // Supabase publishes which providers are enabled on an anon-readable
+  // endpoint, so the UI can reflect the project's real configuration instead
+  // of advertising a provider that will reject the redirect.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    const url = import.meta.env.VITE_SUPABASE_URL as string;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+    let active = true;
+    fetch(`${url}/auth/v1/settings`, { headers: { apikey: key } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (active) setGoogleEnabled(j?.external?.google ?? false);
+      })
+      // A failed probe must not hide a working button, so leave it unknown.
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -78,7 +107,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isEditor: role !== null,
       isAdmin: role === 'ADMIN' || role === 'SUPER_ADMIN',
-      isSuperAdmin: role === 'SUPER_ADMIN',      signInWithGoogle: async () => {
+      isSuperAdmin: role === 'SUPER_ADMIN',
+      googleEnabled,
+      signInWithGoogle: async () => {
         if (!supabase) throw new Error('Supabase is not configured.');
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
@@ -105,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(null);
       },
     };
-  }, [session, role, loading]);
+  }, [session, role, loading, googleEnabled]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

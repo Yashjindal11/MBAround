@@ -53,7 +53,7 @@ function useOAuthError(): string | null {
 }
 
 function SignIn() {
-  const { signInWithGoogle, signInWithEmail, signInWithPassword } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signInWithPassword, googleEnabled } = useAuth();
   const oauthError = useOAuthError();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -80,22 +80,29 @@ function SignIn() {
   return (
     <div className="container-page flex min-h-[70vh] items-center justify-center py-16">
       <div className="surface w-full max-w-sm p-7">
-        <h1 className="font-display text-2xl font-semibold tracking-tight">Admin sign in</h1>
-        <p className="mt-2 text-sm text-ink-500">
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Admin sign in</h1>        <p className="mt-2 text-sm text-ink-500">
           MBAround content management. Access is granted per-user in the database.
         </p>
 
-        <button
-          onClick={() => run(signInWithGoogle)}
-          disabled={busy}
-          className="btn-secondary mt-6 w-full"
-        >
-          Continue with Google
-        </button>
+        {/* Only offered when the project really has the provider enabled.
+            Showing it otherwise sends the user to "Unsupported provider",
+            which reads as an application bug rather than a missing setting. */}
+        {googleEnabled !== false && (
+          <>
+            <button
+              onClick={() => run(signInWithGoogle)}
+              disabled={busy || googleEnabled === null}
+              className="btn-secondary mt-6 w-full"
+            >
+              Continue with Google
+            </button>
 
-        <div className="my-5 flex items-center gap-3 text-2xs text-ink-400">
-          <span className="h-px flex-1 bg-ink-200" /> or <span className="h-px flex-1 bg-ink-200" />
-        </div>
+            <div className="my-5 flex items-center gap-3 text-2xs text-ink-400">
+              <span className="h-px flex-1 bg-ink-200" /> or{' '}
+              <span className="h-px flex-1 bg-ink-200" />
+            </div>
+          </>
+        )}
 
         {sent ? (
           <p className="rounded-lg bg-accent-50 px-3 py-2.5 text-sm text-accent-800">
@@ -165,14 +172,16 @@ function SignIn() {
               </span>
             )}
           </p>
-        )}
-
-        {oauthError && !error && (
+        )}        {oauthError && !error && (
           <p role="alert" className="mt-4 text-xs text-red-600 dark:text-red-400">
             Google sign-in failed: {oauthError}
             <span className="mt-1 block text-ink-500">
-              Check that the Google provider is enabled in Supabase and that{' '}
-              <code>{window.location.origin}/admin</code> is listed as a redirect URL.
+              {/* "not enabled" comes from Supabase before Google is contacted,
+                  so pointing at redirect URLs would send the reader to the
+                  wrong dashboard entirely. */}
+              {oauthError.toLowerCase().includes('not enabled')
+                ? 'Enable the Google provider in Supabase → Authentication → Providers.'
+                : `Check that ${window.location.origin}/admin is listed as a redirect URL in Supabase.`}
             </span>
           </p>
         )}
