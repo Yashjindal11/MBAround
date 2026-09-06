@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
-import { FixtureBanner, Footer, Header } from './components/Layout';
+import { ConfigBanner, Footer, Header } from './components/Layout';
 import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './components/admin/AdminUI';
 import HomePage from './pages/HomePage';
@@ -35,7 +35,7 @@ function ScrollToTop() {
 function PublicShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
-      <FixtureBanner />
+      <ConfigBanner />
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />

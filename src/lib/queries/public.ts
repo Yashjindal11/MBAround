@@ -7,21 +7,19 @@ import type {
   Program,
   School,
 } from '../types';
-import {
-  fixtureCycles,
-  fixturePrograms,
-  fixtureRounds,
-  fixtureSchools,
-} from './fixture';
 import { mapCycle, mapDeadlineRow, mapProgram, mapRound, mapSchool } from './mappers';
 
 /**
  * Read-side data access.
  *
- * Every public page goes through these functions — no component talks to
- * Supabase directly. When Supabase is not configured we serve the development
- * fixture so the UI is reviewable, but the shapes are identical, so switching
- * to a live database requires no UI changes.
+ * Every public page goes through these functions â€” no component talks to
+ * Supabase directly.
+ *
+ * There is no offline fixture. This product's entire value is that a date on
+ * the screen is a date a school actually published, so an unconfigured build
+ * shows NOTHING rather than plausible-looking placeholders. Fake deadlines are
+ * worse than an empty page: an empty page is obviously broken, while a wrong
+ * deadline looks correct right up until someone misses an application.
  */
 
 export interface SchoolFilters {
@@ -46,91 +44,20 @@ export interface DeadlineFilters {
   includePast?: boolean;
   onlyAnnounced?: boolean;
   sort?: 'nearest' | 'latest' | 'school' | 'round';
-  limit?: number;
-  offset?: number;
+  limit?: number;  offset?: number;
 }
 
-/* -------------------------------------------------------------------------
- * Fixture helpers (dev-only path)
- * ---------------------------------------------------------------------- */
-
-function fixtureDeadlineRows(): DeadlineRow[] {
-  const schoolsById = new Map(fixtureSchools.map((s) => [s.id, s]));
-  const programsById = new Map(fixturePrograms.map((p) => [p.id, p]));
-  const cyclesById = new Map(fixtureCycles.map((c) => [c.id, c]));
-
-  const rows: DeadlineRow[] = [];
-  for (const round of fixtureRounds) {
-    const cycle = cyclesById.get(round.applicationCycleId);
-    if (!cycle) continue;
-    const program = programsById.get(cycle.programId);
-    if (!program || !program.isPublished) continue;
-    const school = schoolsById.get(program.schoolId);
-    if (!school || !school.isPublished) continue;
-
-    rows.push({
-      roundId: round.id,
-      roundName: round.name,
-      roundOrder: round.displayOrder,
-      deadline: round.deadline,
-      decisionDate: round.decisionDate,
-      isAnnounced: round.isAnnounced,
-      isVerified: round.isVerified,
-      sourceUrl: round.sourceUrl,
-      sourceName: round.sourceName,
-      lastVerified: round.lastVerified,
-      notes: round.notes,
-      cycleId: cycle.id,
-      cycleName: cycle.cycleName,
-      programId: program.id,
-      programName: program.name,
-      programType: program.programType,
-      schoolId: school.id,
-      schoolName: school.name,
-      schoolSlug: school.slug,
-      country: school.country,
-      region: school.region,
-      city: school.city,
-    });
-  }
-  return rows;
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
-function applyDeadlineFilters(
-  rows: DeadlineRow[],
-  f: DeadlineFilters,
-  todayIso: string,
-): DeadlineRow[] {
-  let out = rows;
-
-  if (f.onlyAnnounced) out = out.filter((r) => r.isAnnounced && r.deadline);
-  if (!f.includePast) {
-    out = out.filter((r) => !r.deadline || r.deadline >= todayIso);
-  }
-  if (f.search) {
-    const q = f.search.toLowerCase();
-    out = out.filter(
-      (r) =>
-        r.schoolName.toLowerCase().includes(q) ||
-        r.programName.toLowerCase().includes(q) ||
-        r.roundName.toLowerCase().includes(q) ||
-        r.city.toLowerCase().includes(q) ||
-        r.country.toLowerCase().includes(q),
-    );
-  }
-  if (f.countries?.length) out = out.filter((r) => f.countries!.includes(r.country));
-  if (f.regions?.length) out = out.filter((r) => f.regions!.includes(r.region));
-  if (f.schoolIds?.length) out = out.filter((r) => f.schoolIds!.includes(r.schoolId));
-  if (f.programTypes?.length)
-    out = out.filter((r) => f.programTypes!.includes(r.programType));
-  if (f.cycleNames?.length) out = out.filter((r) => f.cycleNames!.includes(r.cycleName));
-  if (f.roundNames?.length) out = out.filter((r) => f.roundNames!.includes(r.roundName));
-  if (f.from) out = out.filter((r) => r.deadline && r.deadline >= f.from!);
-  if (f.to) out = out.filter((r) => r.deadline && r.deadline <= f.to!);
-
-  return sortDeadlineRows(out, f.sort ?? 'nearest');
-}
-
+/**
+ * The ordering contract, kept in TypeScript even though the live path sorts in
+ * SQL, because it is the one piece of ordering logic worth asserting directly:
+ * an undated round must never jump ahead of a dated one. Callers that merge or
+ * re-sort rows client-side (Compare, Timeline) use this so a school with no
+ * announced dates sinks to the bottom instead of masquerading as "due soonest".
+ */
 export function sortDeadlineRows(
   rows: DeadlineRow[],
   sort: NonNullable<DeadlineFilters['sort']>,
@@ -146,14 +73,12 @@ export function sortDeadlineRows(
     case 'school':
       return copy.sort(
         (a, b) =>
-          a.schoolName.localeCompare(b.schoolName) ||
-          a.roundOrder - b.roundOrder,
+          a.schoolName.localeCompare(b.schoolName) || a.roundOrder - b.roundOrder,
       );
     case 'round':
       return copy.sort(
         (a, b) =>
-          a.roundOrder - b.roundOrder ||
-          a.schoolName.localeCompare(b.schoolName),
+          a.roundOrder - b.roundOrder || a.schoolName.localeCompare(b.schoolName),
       );
     case 'nearest':
     default:
@@ -167,8 +92,20 @@ export function sortDeadlineRows(
   }
 }
 
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+/**
+ * Narrows the client to non-null, and refuses to serve anything when the
+ * database is absent. Returning empty arrays instead of throwing would let a
+ * misconfigured deploy look like "no deadlines announced yet", which is a
+ * factual claim we would be making without evidence.
+ */
+function db() {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error(
+      'Supabase is not configured. MBAround serves only database-backed, ' +
+        'sourced data — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+    );
+  }
+  return supabase;
 }
 
 /* -------------------------------------------------------------------------
@@ -176,30 +113,7 @@ function todayIso(): string {
  * ---------------------------------------------------------------------- */
 
 export async function getSchools(filters: SchoolFilters = {}): Promise<School[]> {
-  if (!isSupabaseConfigured || !supabase) {
-    let out = fixtureSchools.filter((s) => s.isPublished);
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      out = out.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          (s.shortName ?? '').toLowerCase().includes(q) ||
-          s.city.toLowerCase().includes(q) ||
-          s.country.toLowerCase().includes(q),
-      );
-    }
-    if (filters.countries?.length)
-      out = out.filter((s) => filters.countries!.includes(s.country));
-    if (filters.regions?.length)
-      out = out.filter((s) => filters.regions!.includes(s.region));
-    out = out.sort(
-      (a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
-    );
-    const start = filters.offset ?? 0;
-    return filters.limit ? out.slice(start, start + filters.limit) : out;
-  }
-
-  let query = supabase
+  let query = db()
     .from('schools')
     .select('*')
     .eq('is_published', true)
@@ -220,13 +134,7 @@ export async function getSchools(filters: SchoolFilters = {}): Promise<School[]>
 }
 
 export async function getFeaturedSchools(limit = 6): Promise<School[]> {
-  if (!isSupabaseConfigured || !supabase) {
-    return fixtureSchools
-      .filter((s) => s.isPublished && s.isFeatured)
-      .sort((a, b) => a.displayOrder - b.displayOrder)
-      .slice(0, limit);
-  }
-  const { data, error } = await supabase
+  const { data, error } = await db()
     .from('schools')
     .select('*')
     .eq('is_published', true)
@@ -238,10 +146,7 @@ export async function getFeaturedSchools(limit = 6): Promise<School[]> {
 }
 
 export async function getSchoolBySlug(slug: string): Promise<School | null> {
-  if (!isSupabaseConfigured || !supabase) {
-    return fixtureSchools.find((s) => s.slug === slug && s.isPublished) ?? null;
-  }
-  const { data, error } = await supabase
+  const { data, error } = await db()
     .from('schools')
     .select('*')
     .eq('slug', slug)
@@ -261,12 +166,7 @@ export async function searchSchools(term: string, limit = 10): Promise<School[]>
  * ---------------------------------------------------------------------- */
 
 export async function getProgramsForSchool(schoolId: string): Promise<Program[]> {
-  if (!isSupabaseConfigured || !supabase) {
-    return fixturePrograms
-      .filter((p) => p.schoolId === schoolId && p.isPublished)
-      .sort((a, b) => a.displayOrder - b.displayOrder);
-  }
-  const { data, error } = await supabase
+  const { data, error } = await db()
     .from('programs')
     .select('*')
     .eq('school_id', schoolId)
@@ -278,11 +178,7 @@ export async function getProgramsForSchool(schoolId: string): Promise<Program[]>
 
 export async function getCyclesForProgram(
   programId: string,
-): Promise<ApplicationCycle[]> {
-  if (!isSupabaseConfigured || !supabase) {
-    return fixtureCycles.filter((c) => c.programId === programId);
-  }
-  const { data, error } = await supabase
+): Promise<ApplicationCycle[]> {  const { data, error } = await db()
     .from('application_cycles')
     .select('*')
     .eq('program_id', programId)
@@ -295,12 +191,7 @@ export async function getCyclesForProgram(
 export async function getRoundsForCycle(
   cycleId: string,
 ): Promise<ApplicationRound[]> {
-  if (!isSupabaseConfigured || !supabase) {
-    return fixtureRounds
-      .filter((r) => r.applicationCycleId === cycleId)
-      .sort(compareRounds);
-  }
-  const { data, error } = await supabase
+  const { data, error } = await db()
     .from('application_rounds')
     .select('*')
     .eq('application_cycle_id', cycleId)
@@ -315,14 +206,7 @@ export async function getRoundsForCycle(
 
 export async function getDeadlines(
   filters: DeadlineFilters = {},
-): Promise<DeadlineRow[]> {
-  if (!isSupabaseConfigured || !supabase) {
-    const rows = applyDeadlineFilters(fixtureDeadlineRows(), filters, todayIso());
-    const start = filters.offset ?? 0;
-    return filters.limit ? rows.slice(start, start + filters.limit) : rows;
-  }
-
-  let query = supabase.from('deadline_rows').select('*');
+): Promise<DeadlineRow[]> {  let query = db().from('deadline_rows').select('*');
 
   if (filters.onlyAnnounced) query = query.eq('is_announced', true);
   if (!filters.includePast) query = query.or(`deadline.gte.${todayIso()},deadline.is.null`);
@@ -366,7 +250,7 @@ export async function getDeadlinesForSchool(
 }
 
 /* -------------------------------------------------------------------------
- * Derived filter facets — never hardcoded
+ * Derived filter facets â€” never hardcoded
  * ---------------------------------------------------------------------- */
 
 export interface FilterFacets {
@@ -397,7 +281,7 @@ export async function getFilterFacets(): Promise<FilterFacets> {
   };
 }
 
-/** Region → school count, for the homepage "Explore by region" section. */
+/** Region â†’ school count, for the homepage "Explore by region" section. */
 export async function getRegionCounts(): Promise<
   { region: string; count: number }[]
 > {

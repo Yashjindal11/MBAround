@@ -139,13 +139,16 @@ export function Footer() {
   );
 }
 
-/** Visible only in development when no Supabase project is connected. */
-export function FixtureBanner() {
+/**
+ * Shown when no Supabase project is connected. There is deliberately no
+ * placeholder-data fallback behind this: an unconfigured build shows an error,
+ * not invented deadlines.
+ */
+export function ConfigBanner() {
   if (isSupabaseConfigured) return null;
   return (
     <div className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-center text-2xs font-medium text-amber-900">
-      Preview mode — Supabase is not connected. Showing unverified placeholder
-      data for UI review only.
+      Supabase is not connected — no school data can be loaded.
     </div>
   );
 }

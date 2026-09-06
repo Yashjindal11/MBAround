@@ -10,9 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "seed": "tsx scripts/data/import-top-mba.ts",
-    "seed:sql": "tsx scripts/data/emit-seed-sql.ts"
+    "test:watch": "vitest",    "seed:sql": "tsx scripts/data/emit-seed-sql.ts",
+    "seed:deadlines": "tsx scripts/data/collect-deadlines.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
