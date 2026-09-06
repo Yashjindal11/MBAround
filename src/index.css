@@ -6,14 +6,31 @@
   :root {
     color-scheme: light;
   }
-
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
     @apply bg-sand text-ink-900 font-sans antialiased;
+    /* Contextual alternates + kerning; keeps Inter's default (non-slashed)
+       zero, which reads better than the alternate at small UI sizes. */
+    font-feature-settings: 'cv11', 'ss01';
+    font-variant-ligatures: contextual;
+  }
+
+  /* Headings use the serif at a slightly tighter fit; optical sizing lets
+     Source Serif 4 thin its strokes as display sizes grow. */
+  h1, h2, h3 {
+    font-optical-sizing: auto;
+    text-wrap: balance;
+  }
+
+  /* Dates and countdowns line up in columns only if the figures are tabular. */
+  time,
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 
   ::selection {

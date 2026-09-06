@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAsync } from '../lib/useAsync';
 import {
   getDeadlinesForSchool,
@@ -123,10 +123,60 @@ export default function SchoolDetailPage() {
   const { data: programs } = useAsync(
     () => (school ? getProgramsForSchool(school.id) : Promise.resolve([])),
     [school?.id],
-  );
-  const { data: rows } = useAsync(
+  );  const { data: rows } = useAsync(
     () => (school ? getDeadlinesForSchool(school.id) : Promise.resolve([])),
     [school?.id],
+  );
+
+  /**
+   * Rounds belong to a programme, not to a school: a one-year MBA and a
+   * two-year MBA run entirely different calendars. Showing them in one list
+   * would imply a school has more rounds than it really does, so the page
+   * scopes rounds to a single selected programme.
+   */
+  const [programId, setProgramId] = useState<string | null>(null);
+
+  /**
+   * Programmes that actually have rounds recorded, derived from the rounds
+   * themselves. Ordered to match the school's published programme list, with
+   * any programme appearing only in the rounds data appended rather than
+   * dropped.
+   */
+  const programTabs = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string; type: string }>();
+    for (const r of rows ?? []) {
+      if (!byId.has(r.programId)) {
+        byId.set(r.programId, {
+          id: r.programId,
+          name: r.programName,
+          type: r.programType,
+        });
+      }
+    }
+    const ordered: { id: string; name: string; type: string }[] = [];
+    for (const p of programs ?? []) {
+      const hit = byId.get(p.id);
+      if (hit) {
+        ordered.push(hit);
+        byId.delete(p.id);
+      }
+    }
+    return [...ordered, ...byId.values()];
+  }, [rows, programs]);
+
+  /**
+   * Default to the first programme once data arrives, and recover if the
+   * selected programme disappears (e.g. unpublished in admin) so the page
+   * never renders an empty round list for a stale selection.
+   */
+  const activeProgramId =
+    programId && programTabs.some((p) => p.id === programId)
+      ? programId
+      : (programTabs[0]?.id ?? null);
+
+  const visibleRows = useMemo(
+    () => (rows ?? []).filter((r) => r.programId === activeProgramId),
+    [rows, activeProgramId],
   );
 
   useDocumentTitle(
@@ -209,13 +259,55 @@ export default function SchoolDetailPage() {
           ) : (
             <EmptyState title="No programmes published" />
           )}
-        </InformationSection>
-
-        <InformationSection
+        </InformationSection>        <InformationSection
           title="Application rounds"
           description="Rounds exactly as published by the school — MBAround does not assume a fixed number of rounds."
         >
-          <RoundsTable rows={rows ?? []} />
+          {programTabs.length > 1 && (
+            <div className="mb-5">
+              <p className="label-caps mb-2">Programme</p>
+              <div
+                role="tablist"
+                aria-label="Select a programme"
+                className="flex flex-wrap gap-2"
+              >
+                {programTabs.map((p) => {
+                  const on = p.id === activeProgramId;
+                  return (
+                    <button
+                      key={p.id}
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => setProgramId(p.id)}
+                      className={
+                        'rounded-lg border px-3 py-2 text-left text-xs transition-colors ' +
+                        (on
+                          ? 'border-ink-900 bg-ink-900 text-white'
+                          : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400')
+                      }
+                    >
+                      <span className="block font-medium">{p.name}</span>
+                      <span
+                        className={
+                          'block text-2xs ' + (on ? 'text-white/70' : 'text-ink-500')
+                        }
+                      >
+                        {p.type}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {programTabs.length === 1 && (
+            <p className="mb-4 text-2xs text-ink-500">
+              Showing rounds for {programTabs[0].name}.
+            </p>
+          )}
+
+          <RoundsTable rows={visibleRows} />
         </InformationSection>
 
         <InformationSection title="Data &amp; verification">

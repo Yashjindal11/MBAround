@@ -30,10 +30,9 @@ export default {
           900: '#153935',
         },
         sand: '#faf9f7',
-      },
-      fontFamily: {
+      },      fontFamily: {
         sans: ['Inter var', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        display: ['Fraunces', 'Georgia', 'serif'],
+        display: ['Source Serif 4', 'Charter', 'Georgia', 'serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       fontSize: {
