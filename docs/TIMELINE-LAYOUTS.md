@@ -4,11 +4,33 @@ Three presentations of the same deadline data live side by side while the
 design is being chosen. They share every query, filter and integrity rule; only
 the layout differs.
 
-| Route | Name | Question it answers |
-| --- | --- | --- |
-| `/timeline` | Track | *How is the cycle shaped?* |
-| `/timeline/v2` | Calendar | *How bad is my October?* |
-| `/timeline/v3` | Agenda | *What do I do next?* |
+| Route | Name | Question it answers | |
+| --- | --- | --- | --- |
+| `/timeline/v2` | Calendar | *How bad is my October?* | **primary** |
+| `/timeline/v3` | Agenda | *What do I do next?* | |
+| `/timeline` | Track | *How is the cycle shaped?* | |
+
+Calendar leads the switcher: applicants plan in months, and it is the only
+layout where workload density is legible at a glance.
+
+## One scroll container per rail
+
+The filter rail caps its own height and scrolls. Anything rendered *inside* it
+must be at natural height.
+
+A list with its own `max-h` + `overflow-y-auto` produces two scrollbars side by
+side, each scrolling a different part of the same column — and once the outer
+bar reaches its end, the inner list can no longer be brought into view. This
+existed in `ScopeRail`, `FilterBar` and `ComparePage` simultaneously, because
+the markup had been copied between them.
+
+`tests/layout.test.ts` enforces it: any page rendering `<ScopeRail>` or
+`<FilterBar>` that also contains a rem-capped scroll region fails the suite.
+Mutation-verified against `ComparePage`.
+
+The rail header sits *outside* the scroll area so "Clear all" never scrolls
+away, and scroll regions use `.scroll-slim` — the default ~17px high-contrast
+bar reads as a structural divider in a narrow sidebar rather than a control.
 
 ## Why three
 
@@ -24,10 +46,15 @@ it has two structural weaknesses:
   pixel apart, which reads as "about the same time" rather than "both due that
   week". Same-day collisions across schools disappear entirely.
 
-**v2 (Calendar)** fixes the first by giving every month equal vertical space,
-including months with nothing due, so quiet stretches stay legible instead of
-collapsing into a border. A density bar scaled to the busiest month shows load
-before a single row is read.
+**v2 (Calendar)** fixes the first with a real day grid, so position within the
+month carries meaning and a same-day collision is a visible cluster rather than
+overlapping dots. Empty months are still rendered so quiet stretches stay
+legible, and a load bar scaled to the busiest month shows density before a
+single row is read.
+
+Grid cells are too small to carry school, programme and round names, so detail
+moves to hover in grid mode. A **list** toggle renders the same month as full
+rows — better for reading detail, and for screen readers.
 
 **v3 (Agenda)** fixes the second by abandoning the spatial axis. Rounds are
 bucketed by urgency (closed / this week / this month / next 3 months / later)
@@ -35,14 +62,39 @@ and same-day collisions are called out explicitly at the top. Past rounds are
 collapsed behind a disclosure rather than dropped — knowing a deadline has gone
 is useful, and deleting it would misrepresent the cycle.
 
-## Shared behaviour
+## Shared components
 
 `src/components/useTimelineData.ts` loads schools and rounds for all three. If
 each page fetched independently they would drift, and a layout could end up
 flattering itself with data the others do not get.
 
-`src/components/TimelineChrome.tsx` holds the switcher, the demo banner, the
-unannounced-rounds list and the empty state.
+`src/components/TimelineChrome.tsx` holds `TimelineHeader` (one heading
+hierarchy across all three, which matters for SEO and screen-reader
+navigation), the switcher, the demo banner, the unannounced-rounds list and the
+empty state.
+
+`src/components/SchoolPicker.tsx` is the school checklist. Four pages had
+near-identical copies, each carrying the same nested-scroll bug. It adds a
+selection progress bar, and above ten schools a local filter that narrows what
+is *shown* without ever changing what is *selected* — typing must not silently
+deselect a school the user already chose.
+
+## Design tokens
+
+`src/index.css` defines the surfaces these pages are built from, so panels stop
+being ad-hoc `.surface` + border stacks:
+
+| Class | Use |
+| --- | --- |
+| `.panel` / `.panel-lift` | Raised card; the lift variant on hover |
+| `.panel-head` | Header row inside a panel |
+| `.pill-neutral` / `.pill-accent` | Counts and states |
+| `.segmented` / `.segmented-item` | Switching between views of one dataset |
+| `.scroll-slim` | Slim, theme-aware scrollbar for scroll regions |
+| `.mask-fade-y` | Fades a scroll region's edges so clipped content reads as "continues" |
+
+Colour is never the only signal — every pill and urgency dot is paired with
+text.
 
 Two rules every layout must keep:
 
