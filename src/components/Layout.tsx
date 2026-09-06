@@ -147,7 +147,7 @@ export function Footer() {
 export function ConfigBanner() {
   if (isSupabaseConfigured) return null;
   return (
-    <div className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-center text-2xs font-medium text-amber-900">
+    <div className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-center text-2xs font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
       Supabase is not connected — no school data can be loaded.
     </div>
   );

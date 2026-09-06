@@ -1,5 +1,5 @@
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ConfigBanner, Footer, Header } from './components/Layout';
 import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './components/admin/AdminUI';
@@ -31,13 +31,56 @@ function ScrollToTop() {
   return null;
 }
 
+/**
+ * Announces navigation to assistive technology.
+ *
+ * In a SPA the URL changes but focus and the accessible document title do not,
+ * so a screen-reader user gets no signal that the page changed - content is
+ * simply replaced underneath them. The page components set document.title via
+ * useSeo; this reads it back into a live region after that has happened.
+ */
+function RouteAnnouncer() {
+  const { pathname } = useLocation();
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    // Deferred a frame: useSeo runs in the page's own effect, so reading the
+    // title synchronously here would announce the previous route's name.
+    const id = window.setTimeout(() => {
+      setMessage(document.title ? `${document.title} — page loaded` : 'Page loaded');
+    }, 100);
+    return () => window.clearTimeout(id);
+  }, [pathname]);
+
+  return (
+    <div aria-live="polite" aria-atomic="true" className="sr-only">
+      {message}
+    </div>
+  );
+}
+
 /** Public chrome. The admin area has its own shell, so it opts out of this. */
 function PublicShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
+      {/*
+        Keyboard users would otherwise tab the whole header - wordmark, four nav
+        links, theme control, sign-in - on every single navigation before
+        reaching content.
+      */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-ink-900 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+      >
+        Skip to content
+      </a>
       <ConfigBanner />
       <Header />
-      <main className="flex-1">{children}</main>
+      {/* tabIndex={-1} makes the target focusable so the skip link actually
+          moves focus, not just the scroll position. */}
+      <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
+        {children}
+      </main>
       <Footer />
     </div>
   );
@@ -49,6 +92,7 @@ export default function App() {
       <AuthProvider>
         <ToastProvider>
           <ScrollToTop />
+          <RouteAnnouncer />
           <Routes>
             {/* Admin CMS — authentication + database-enforced authorisation */}
             <Route path="/admin" element={<AdminLayout />}>

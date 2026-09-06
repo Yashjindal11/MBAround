@@ -11,10 +11,13 @@ const STYLES: Record<
     label: 'Verified',
     className: 'bg-accent-50 text-accent-700 border-accent-200',
     dot: 'bg-accent-500',
-  },
-  NEEDS_REVIEW: {
+  },  NEEDS_REVIEW: {
     label: 'Needs review',
-    className: 'bg-amber-50 text-amber-800 border-amber-200',
+    // amber-* are fixed Tailwind values outside the CSS-variable theme, so the
+    // dark variants are explicit. This badge marks unverified data, so it has
+    // to stay legible in both themes - a warning nobody can read is no warning.
+    className:
+      'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-900/50',
     dot: 'bg-amber-500',
   },
   NOT_ANNOUNCED: {

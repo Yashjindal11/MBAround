@@ -3,13 +3,20 @@ import { countdownLabel, daysUntil, formatDate, formatDateShort } from '../lib/d
 import type { DeadlineRow, School } from '../lib/types';
 import { ProvenanceLine } from './VerificationBadge';
 
-/** Colour-codes urgency without shouting. */
+/**
+ * Colour-codes urgency without shouting.
+ *
+ * red-600/amber-700 are fixed Tailwind values outside the CSS-variable theme,
+ * so dark variants are explicit: red-600 on the dark canvas falls below AA and
+ * the "closing this week" cue would be hardest to read exactly when it matters
+ * most. Colour is never the only signal - the countdown text states the days.
+ */
 function urgencyClass(deadline: string | null): string {
   const days = daysUntil(deadline);
   if (days === null) return 'text-ink-400';
   if (days < 0) return 'text-ink-400';
-  if (days <= 7) return 'text-red-600';
-  if (days <= 30) return 'text-amber-700';
+  if (days <= 7) return 'text-red-600 dark:text-red-400';
+  if (days <= 30) return 'text-amber-700 dark:text-amber-400';
   return 'text-ink-500';
 }
 

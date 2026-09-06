@@ -131,7 +131,11 @@ export default function SuggestPage() {
             <input name="email" type="email" className="field mt-1.5" />
           </label>
 
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && (
+            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+              {error}
+            </p>
+          )}
 
           <button type="submit" disabled={busy} className="btn-primary w-full">
             {busy ? 'Submitting…' : 'Submit suggestion'}
