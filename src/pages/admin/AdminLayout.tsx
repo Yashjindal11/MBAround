@@ -79,8 +79,8 @@ function SignIn() {
 
   return (
     <div className="container-page flex min-h-[70vh] items-center justify-center py-16">
-      <div className="surface w-full max-w-sm p-7">
-        <h1 className="font-display text-2xl font-semibold tracking-tight">Admin sign in</h1>        <p className="mt-2 text-sm text-ink-500">
+      <div className="surface w-full max-w-sm p-7">        <h1 className="font-display text-2xl font-semibold tracking-tight">Admin sign in</h1>
+        <p className="mt-2 text-sm text-ink-500">
           MBAround content management. Access is granted per-user in the database.
         </p>
 
@@ -102,6 +102,17 @@ function SignIn() {
               <span className="h-px flex-1 bg-ink-200" />
             </div>
           </>
+        )}
+
+        {/* Silently removing the button is its own failure: an absent control
+            is indistinguishable from a broken one, and the reader has no way
+            to know a dashboard setting is responsible. Say so. */}
+        {googleEnabled === false && (
+          <p className="mt-5 rounded-lg bg-ink-50 px-3 py-2.5 text-2xs leading-relaxed text-ink-600 dark:bg-ink-100">
+            Google sign-in is not enabled on this Supabase project, so it is not
+            offered here. Turn it on under{' '}
+            <strong>Authentication → Providers → Google</strong>.
+          </p>
         )}
 
         {sent ? (
