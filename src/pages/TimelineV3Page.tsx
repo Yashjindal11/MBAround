@@ -4,10 +4,11 @@ import { countdownLabel, daysUntil, formatDate, verificationState } from '../lib
 import { ErrorState, LoadingState } from '../components/States';
 import { VerificationBadge } from '../components/VerificationBadge';
 import { ScopeRail, useSchoolScope } from '../components/SchoolScope';
+import { SchoolPicker } from '../components/SchoolPicker';
 import {
   DemoBanner,
   TimelineEmpty,
-  TimelineViewSwitcher,
+  TimelineHeader,
   UnannouncedList,
 } from '../components/TimelineChrome';
 import { useTimelineData } from '../components/useTimelineData';
@@ -149,85 +150,52 @@ export default function TimelineV3Page() {
       .filter(([, items]) => items.length > 1)
       .sort((a, b) => (a[0] < b[0] ? -1 : 1));
   }, [dated]);
-
   const nextUp = useMemo(
     () => dated.find((r) => (daysUntil(r.deadline) ?? -1) >= 0) ?? null,
     [dated],
   );
 
+  const upcomingCount = useMemo(
+    () => dated.filter((r) => (daysUntil(r.deadline) ?? -1) >= 0).length,
+    [dated],
+  );
+
+  const stats = useMemo(
+    () => [
+      { label: 'Upcoming', value: String(upcomingCount) },
+      { label: 'Clashing dates', value: String(clashes.length) },
+      {
+        label: 'Next deadline',
+        value: nextUp ? countdownLabel(nextUp.deadline).replace(' remaining', '') : '—',
+      },
+    ],
+    [upcomingCount, clashes.length, nextUp],
+  );
+
   const rail = (
-    <div className="space-y-3">
+    <div className="space-y-1">
       {scope.controls}
-      <div className="border-t border-ink-100 pt-4">
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="label-caps">Schools</h3>
-          <span className="text-2xs text-ink-500">
-            {selectedCount} of {railSchools.length}
-          </span>
-        </div>
-        <div className="mt-2 flex gap-3 border-b border-ink-100 pb-3">
-          <button
-            type="button"
-            onClick={selectAll}
-            disabled={selectedCount === railSchools.length}
-            className="text-2xs font-medium text-accent-700 hover:underline disabled:cursor-default disabled:text-ink-300 disabled:no-underline"
-          >
-            Select all
-          </button>
-          <button
-            type="button"
-            onClick={selectNone}
-            disabled={selectedCount === 0}
-            className="text-2xs font-medium text-accent-700 hover:underline disabled:cursor-default disabled:text-ink-300 disabled:no-underline"
-          >
-            Clear
-          </button>
-        </div>
-        <div className="mt-2 max-h-[22rem] space-y-0.5 overflow-y-auto pr-1">
-          {railSchools.length === 0 ? (
-            <p className="py-2 text-2xs text-ink-500">No schools match these filters.</p>
-          ) : (
-            railSchools.map((s) => (
-              <label
-                key={s.id}
-                className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm text-ink-700 hover:bg-ink-50"
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected(s.slug)}
-                  onChange={() => toggle(s.slug)}
-                  className="h-3.5 w-3.5 shrink-0 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
-                />
-                <span className="truncate" title={s.name}>
-                  {s.shortName ?? s.name}
-                </span>
-              </label>
-            ))
-          )}
-        </div>
-      </div>
+      <SchoolPicker
+        schools={railSchools}
+        deselected={deselected}
+        onToggle={toggle}
+        onSelectAll={selectAll}
+        onSelectNone={selectNone}
+      />
     </div>
   );
 
   return (
-    <div className="container-page py-12">
-      <header className="max-w-2xl">
-        <p className="label-caps">Plan ahead</p>
-        <h1 className="mt-1.5 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          What&rsquo;s next
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-ink-600">
-          Rounds grouped by how soon they close, nearest first &mdash; and an
-          explicit warning wherever two schools want work from you on the same
-          day.
-        </p>
-      </header>
+    <div className="container-page py-10 sm:py-14">
+      <TimelineHeader
+        eyebrow="Plan ahead"
+        title="What's next"
+        intro="Rounds grouped by how soon they close, nearest first — and an explicit warning wherever two schools want work from you on the same day."
+        current="/timeline/v3"
+        stats={dated.length > 0 ? stats : undefined}
+      />
 
-      <div className="mt-6">
-        <TimelineViewSwitcher current="/timeline/v3" />
-      </div>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-[16rem_1fr]">
+      <div className="mt-8 grid gap-6 lg:grid-cols-[17rem_1fr]">
         <ScopeRail activeCount={scope.activeCount} onClear={scope.clearAll}>
           {rail}
         </ScopeRail>
@@ -243,34 +211,55 @@ export default function TimelineV3Page() {
           )}
 
           {dated.length > 0 && (
-            <>
-              {/* The single most useful fact on the page, stated plainly. */}
+            <>              {/* The single most useful fact on the page, stated plainly. */}
               {nextUp && (
-                <div className="surface mb-4 border-l-2 border-l-accent-500 p-5">
-                  <p className="label-caps text-accent-700">Next deadline</p>
-                  <p className="mt-1.5 font-display text-lg font-semibold text-ink-900">
-                    {nextUp.schoolName} &mdash; {nextUp.roundName}
-                  </p>
-                  <p className="mt-0.5 text-sm text-ink-600">
-                    {formatDate(nextUp.deadline)} &middot;{' '}
-                    <span className="font-medium text-ink-900">
-                      {countdownLabel(nextUp.deadline)}
-                    </span>
-                  </p>
+                <div className="panel mb-4 overflow-hidden">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-4 border-l-[3px] border-l-accent-500 p-5">
+                    <div className="min-w-0 flex-1">
+                      <p className="label-caps text-accent-700">Next deadline</p>
+                      <p className="mt-1.5 font-display text-xl font-semibold leading-tight text-ink-900">
+                        {nextUp.schoolName}
+                      </p>
+                      <p className="mt-0.5 text-2xs text-ink-500">
+                        {nextUp.programName} &middot; {nextUp.roundName}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="tabular font-display text-2xl font-semibold leading-none text-ink-900">
+                        {countdownLabel(nextUp.deadline).replace(' remaining', '')}
+                      </p>
+                      <p className="mt-1.5 text-2xs text-ink-500">
+                        {formatDate(nextUp.deadline)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
               {clashes.length > 0 && (
-                <section className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-5 py-4 dark:border-amber-500/40 dark:bg-amber-500/10">
-                  <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                <section className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 dark:border-amber-500/40 dark:bg-amber-500/10">
+                  <h2 className="flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden>
+                      <path
+                        d="M10 2.75 18 17.25H2L10 2.75Z"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinejoin="round"
+                      />
+                      <path d="M10 8v3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <circle cx="10" cy="14.25" r="0.9" fill="currentColor" />
+                    </svg>
                     {clashes.length} date{clashes.length === 1 ? '' : 's'} with more than one
                     deadline
                   </h2>
-                  <ul className="mt-2 space-y-1.5">
+                  <ul className="mt-2.5 space-y-1.5">
                     {clashes.map(([day, items]) => (
-                      <li key={day} className="text-2xs text-amber-800 dark:text-amber-300/90">
-                        <span className="font-medium">{formatDate(day)}</span> &mdash;{' '}
-                        {items.map((i) => `${i.schoolName} (${i.roundName})`).join(', ')}
+                      <li
+                        key={day}
+                        className="flex flex-wrap gap-x-2 text-2xs text-amber-800 dark:text-amber-300/90"
+                      >
+                        <span className="font-semibold">{formatDate(day)}</span>
+                        <span>{items.map((i) => `${i.schoolName} (${i.roundName})`).join(', ')}</span>
                       </li>
                     ))}
                   </ul>
@@ -289,7 +278,7 @@ export default function TimelineV3Page() {
                         key={bucket.id}
                         type="button"
                         onClick={() => setShowPast(true)}
-                        className="w-full rounded-lg border border-dashed border-ink-200 px-4 py-3 text-2xs font-medium text-ink-500 hover:border-ink-300 hover:text-ink-700"
+                        className="w-full rounded-xl border border-dashed border-ink-200 px-4 py-3 text-2xs font-medium text-ink-500 transition-colors hover:border-ink-300 hover:bg-ink-50/60 hover:text-ink-700"
                       >
                         Show {items.length} closed deadline{items.length === 1 ? '' : 's'}
                       </button>
@@ -297,15 +286,15 @@ export default function TimelineV3Page() {
                   }
 
                   return (
-                    <section key={bucket.id} className="surface overflow-hidden">
-                      <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-3">
+                    <section key={bucket.id} className="panel overflow-hidden">
+                      <div className="panel-head">
                         <div className="flex items-center gap-2.5">
                           <span className={'h-2 w-2 rounded-full ' + accentFor(bucket.id)} />
                           <h2 className="text-sm font-semibold text-ink-900">{bucket.label}</h2>
                           <span className="text-2xs text-ink-400">{bucket.hint}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-2xs text-ink-500">{items.length}</span>
+                          <span className="pill-neutral tabular">{items.length}</span>
                           {bucket.id === 'overdue' && (
                             <button
                               type="button"

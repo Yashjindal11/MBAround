@@ -97,11 +97,15 @@ export function FilterBar({
         aria-haspopup="dialog"
       >
         Filters{activeCount > 0 && ` (${activeCount})`}
-      </button>
-
-      <aside className="hidden lg:block">
-        <div className="surface sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto p-5">
-          <div className="mb-3 flex items-center justify-between">
+      </button>      <aside className="hidden lg:block">
+        {/*
+          The rail is the only scroll container. A `max-h` on a list *inside*
+          it would produce two nested scrollbars side by side, each scrolling a
+          different part of the same column.
+        */}
+        <div className="panel sticky top-24 flex max-h-[calc(100vh-7.5rem)] flex-col overflow-hidden">
+          {/* Outside the scroll area so "Clear all" never scrolls away. */}
+          <div className="panel-head shrink-0">
             <h2 className="text-sm font-semibold text-ink-900">Filters</h2>
             {activeCount > 0 && (
               <button onClick={onClear} className="text-2xs font-medium text-accent-700 hover:underline">
@@ -109,15 +113,18 @@ export function FilterBar({
               </button>
             )}
           </div>
-          {children}
+          <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
         </div>
       </aside>
 
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-ink-950/40" onClick={() => setOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white p-5 pb-8">
-            <div className="mb-4 flex items-center justify-between">
+          <div
+            className="absolute inset-0 bg-ink-950/40 backdrop-blur-[2px]"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col rounded-t-2xl bg-white">
+            <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
               <h2 className="text-base font-semibold">Filters</h2>
               <div className="flex items-center gap-3">
                 {activeCount > 0 && (
@@ -132,10 +139,12 @@ export function FilterBar({
                 </button>
               </div>
             </div>
-            {children}
-            <button onClick={() => setOpen(false)} className="btn-primary mt-5 w-full">
-              Show results
-            </button>
+            <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+            <div className="shrink-0 border-t border-ink-100 p-4">
+              <button onClick={() => setOpen(false)} className="btn-primary w-full">
+                Show results
+              </button>
+            </div>
           </div>
         </div>
       )}

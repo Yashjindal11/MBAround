@@ -9,10 +9,12 @@ import {
 import { ErrorState, LoadingState } from '../components/States';
 import { VerificationBadge } from '../components/VerificationBadge';
 import { ScopeRail, useSchoolScope } from '../components/SchoolScope';
+import { SchoolPicker } from '../components/SchoolPicker';
 import {
   DemoBanner,
   TimelineEmpty,
-  TimelineViewSwitcher,
+  TimelineHeader,
+  UnannouncedList,
 } from '../components/TimelineChrome';
 import { useTimelineData } from '../components/useTimelineData';
 import { useSeo } from '../lib/seo';
@@ -158,83 +160,28 @@ export default function TimelinePage() {
   }, [dated]);
 
   const rail = (
-    <div className="space-y-3">
+    <div className="space-y-1">
       {scope.controls}
-
-      <div className="border-t border-ink-100 pt-4">
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="label-caps">Schools</h3>
-          <span className="text-2xs text-ink-500">
-            {selectedCount} of {railSchools.length}
-          </span>
-        </div>
-
-        <div className="mt-2 flex gap-3 border-b border-ink-100 pb-3">
-          <button
-            type="button"
-            onClick={selectAll}
-            disabled={selectedCount === railSchools.length}
-            className="text-2xs font-medium text-accent-700 hover:underline disabled:cursor-default disabled:text-ink-300 disabled:no-underline"
-          >
-            Select all
-          </button>
-          <button
-            type="button"
-            onClick={selectNone}
-            disabled={selectedCount === 0}
-            className="text-2xs font-medium text-accent-700 hover:underline disabled:cursor-default disabled:text-ink-300 disabled:no-underline"
-          >
-            Clear
-          </button>
-        </div>
-
-        <div className="mt-2 max-h-[22rem] space-y-0.5 overflow-y-auto pr-1">
-          {railSchools.length === 0 ? (
-            <p className="py-2 text-2xs text-ink-500">
-              No schools match these filters.
-            </p>
-          ) : (
-            railSchools.map((s) => (
-              <label
-                key={s.id}
-                className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm text-ink-700 hover:bg-ink-50"
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected(s.slug)}
-                  onChange={() => toggle(s.slug)}
-                  className="h-3.5 w-3.5 shrink-0 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
-                />
-                <span className="truncate" title={s.name}>
-                  {s.shortName ?? s.name}
-                </span>
-              </label>
-            ))
-          )}
-        </div>
-      </div>
+      <SchoolPicker
+        schools={railSchools}
+        deselected={deselected}
+        onToggle={toggle}
+        onSelectAll={selectAll}
+        onSelectNone={selectNone}
+      />
     </div>
   );
 
   return (
-    <div className="container-page py-12">
-      <header className="max-w-2xl">
-        <p className="label-caps">Plan ahead</p>
-        <h1 className="mt-1.5 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          Timeline
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-ink-600">
-          Every announced round, laid out in time. Narrow the list on the left to
-          focus on the schools you care about. Rounds a school hasn&rsquo;t
-          announced yet are listed separately rather than guessed at.
-        </p>
-      </header>
+    <div className="container-page py-10 sm:py-14">
+      <TimelineHeader
+        eyebrow="Plan ahead"
+        title="Timeline"
+        intro="Every announced round, laid out in proportion to real time. Rounds a school hasn't announced yet are listed separately rather than guessed at."
+        current="/timeline"
+      />
 
-      <div className="mt-6">
-        <TimelineViewSwitcher current="/timeline" />
-      </div>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-[16rem_1fr]">
+      <div className="mt-8 grid gap-6 lg:grid-cols-[17rem_1fr]">
         <ScopeRail activeCount={scope.activeCount} onClear={scope.clearAll}>
           {rail}
         </ScopeRail>
@@ -255,7 +202,7 @@ export default function TimelinePage() {
           {grouped.length > 0 && (
             <>
               {/* Desktop: proportional horizontal track */}
-              <div className="surface hidden overflow-hidden lg:block">
+              <div className="panel hidden overflow-hidden lg:block">
                 <div className="border-b border-ink-100 px-6 pb-2 pt-4">
                   <div className="relative h-4">
                     {months.map((m) => (
@@ -345,7 +292,7 @@ export default function TimelinePage() {
               {/* Mobile: vertical timeline */}
               <div className="lg:hidden">
                 {grouped.map(([label, items]) => (
-                  <div key={label} className="surface mb-4 p-5">
+                  <div key={label} className="panel mb-4 p-5">
                     <p className="mb-4 text-sm font-semibold text-ink-900">{label}</p>
                     <ol className="relative border-l border-ink-200 pl-5">
                       {items.map((r) => (
@@ -373,28 +320,7 @@ export default function TimelinePage() {
             </>
           )}
 
-          {undated.length > 0 && (
-            <section className="surface mt-6 p-5">
-              <h2 className="text-sm font-semibold text-ink-900">Not yet announced</h2>
-              <p className="mt-1 text-2xs text-ink-500">
-                These rounds exist but the school hasn&rsquo;t published a date, so
-                they aren&rsquo;t placed on the timeline.
-              </p>
-              <ul className="mt-3 divide-y divide-ink-100">
-                {undated.map((r) => (
-                  <li
-                    key={r.roundId}
-                    className="flex flex-wrap items-center justify-between gap-2 py-2.5"
-                  >
-                    <span className="text-sm text-ink-700">
-                      {r.schoolName} - {r.programName} - {r.roundName}
-                    </span>
-                    <VerificationBadge state={verificationState(r)} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <UnannouncedList rows={undated} />
         </div>
       </div>
     </div>

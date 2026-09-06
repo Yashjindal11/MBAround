@@ -192,7 +192,15 @@ export function useSchoolScope(
   return { schools, activeCount, clearAll, controls };
 }
 
-/** Sticky sidebar wrapper shared by Compare and Timeline. */
+/**
+ * Sticky sidebar wrapper shared by Compare and Timeline.
+ *
+ * The rail itself is the ONLY scroll container. It previously capped its own
+ * height *and* contained a school list with its own `max-h`, so on a long list
+ * two scrollbars sat side by side - one nested inside the other, each
+ * scrolling a different amount of the same column. Callers must therefore
+ * render their lists at natural height and let the rail do the scrolling.
+ */
 export function ScopeRail({
   activeCount,
   onClear,
@@ -205,8 +213,10 @@ export function ScopeRail({
   return (
     <>
       <aside className="hidden lg:block">
-        <div className="surface sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto p-5">
-          <div className="mb-3 flex items-center justify-between">
+        <div className="panel sticky top-24 flex max-h-[calc(100vh-7.5rem)] flex-col overflow-hidden">
+          {/* Header is outside the scroll area so "Clear all" never scrolls
+              away while the user is deep in a long list of schools. */}
+          <div className="panel-head shrink-0">
             <h2 className="text-sm font-semibold text-ink-900">Filters</h2>
             {activeCount > 0 && (
               <button
@@ -217,13 +227,31 @@ export function ScopeRail({
               </button>
             )}
           </div>
-          {children}
+          <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {children}
+          </div>
         </div>
       </aside>
 
-      <details className="surface p-5 lg:hidden">
-        <summary className="cursor-pointer text-sm font-semibold text-ink-900">
-          Filters{activeCount > 0 ? ' (' + activeCount + ')' : ''}
+      <details className="panel group p-5 lg:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-ink-900">
+          <span>Filters{activeCount > 0 ? ` (${activeCount})` : ''}</span>
+          <svg
+            className="text-ink-400 transition-transform duration-200 group-open:rotate-180"
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            fill="none"
+            aria-hidden
+          >
+            <path
+              d="M5 7.5 10 12.5 15 7.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </summary>
         <div className="mt-4">{children}</div>
       </details>

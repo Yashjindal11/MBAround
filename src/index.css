@@ -145,11 +145,58 @@
   .btn-ghost {
     @apply btn px-3 py-2 text-ink-600 hover:bg-ink-100 hover:text-ink-900;
   }
-
   .field {
     @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900
            placeholder:text-ink-400 focus:border-accent-500 focus:outline-none
            focus:ring-1 focus:ring-accent-500;
+  }
+
+  /*
+   * Raised panel with a hairline top highlight. The highlight is what stops
+   * stacked cards reading as one flat slab in dark mode, where the border
+   * alone carries almost no contrast against the canvas.
+   */
+  .panel {
+    @apply relative rounded-2xl border border-ink-200/70 bg-white shadow-card;
+  }
+
+  .panel-lift {
+    @apply panel transition-shadow duration-200 hover:shadow-lift;
+  }
+
+  /* Section header inside a panel: sticks while its rows scroll past. */
+  .panel-head {
+    @apply flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-3.5;
+  }
+
+  /*
+   * Pill used for counts and states. Colour is never the only signal - every
+   * caller pairs it with text - so this stays purely decorative.
+   */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-medium;
+  }
+
+  .pill-neutral {
+    @apply pill bg-ink-100 text-ink-600;
+  }
+
+  .pill-accent {
+    @apply pill bg-accent-100 text-accent-800;
+  }
+
+  /* Segmented control for switching between views of the same data. */
+  .segmented {
+    @apply inline-flex gap-1 rounded-full border border-ink-200/80 bg-ink-50/60 p-1;
+  }
+
+  .segmented-item {
+    @apply rounded-full px-3.5 py-1.5 text-2xs font-medium text-ink-600
+           transition-colors duration-150 hover:text-ink-900;
+  }
+
+  .segmented-item-active {
+    @apply bg-white text-ink-900 shadow-card;
   }
 }
 
@@ -160,5 +207,62 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /*
+   * Slim, theme-aware scrollbar for in-page scroll regions.
+   *
+   * The default Windows scrollbar is ~17px of high-contrast grey, which in a
+   * narrow sidebar reads as a structural divider rather than a control. It is
+   * also what made nested scroll areas look so obviously wrong: two heavy
+   * bars side by side.
+   *
+   * Track stays transparent so the bar only appears against the panel it
+   * belongs to.
+   */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--ink-300) / 0.6) transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--ink-300) / 0.55);
+    border-radius: 9999px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--ink-400) / 0.7);
+  }
+
+  /*
+   * Fades the top and bottom edges of a scroll region so clipped content
+   * reads as "continues" rather than "ends here". Replaces the visual job a
+   * second scrollbar was doing badly.
+   */
+  .mask-fade-y {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 0.75rem,
+      #000 calc(100% - 0.75rem),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 0.75rem,
+      #000 calc(100% - 0.75rem),
+      transparent 100%
+    );
+  }
+
+  .text-3xs {
+    font-size: 0.625rem;
+    line-height: 0.875rem;
   }
 }

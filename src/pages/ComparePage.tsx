@@ -104,7 +104,9 @@ export default function ComparePage() {
                 </button>
               )}
 
-              <div className="mt-2 max-h-[24rem] space-y-0.5 overflow-y-auto pr-1">
+              {/* Natural height: ScopeRail owns the single scroll container,
+                  so a `max-h` here would nest two scrollbars. */}
+              <div className="mt-2 space-y-0.5">
                 {scope.schools.length === 0 ? (
                   <p className="py-2 text-2xs text-ink-500">
                     No schools match these filters.
