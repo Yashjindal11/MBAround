@@ -138,6 +138,59 @@ password**, or create the user with **Add user** and tick *Auto Confirm User*.
 If you are locked out with no password set, the SQL editor is unaffected by
 any of this — it runs privileged and does not need an app session.
 
+### Configuring Google sign-in
+
+The application code is already complete (`signInWithOAuth`); what follows is
+provider configuration, done once.
+
+**1. Google Cloud Console** → *APIs & Services → Credentials* → *Create
+credentials → OAuth client ID* → **Web application**.
+
+Authorised redirect URI — this is Supabase's callback, **not** your app:
+
+```
+https://<project-ref>.supabase.co/auth/v1/callback
+```
+
+Getting this wrong is the single most common failure. Google rejects the
+sign-in before Supabase is ever reached, with `redirect_uri_mismatch`.
+
+**2. Supabase** → *Authentication → Providers → Google* → enable, paste the
+client ID and secret.
+
+**3. Supabase** → *Authentication → URL Configuration*:
+
+| Field | Value |
+|---|---|
+| Site URL | `http://localhost:5174` in development |
+| Redirect URLs | `http://localhost:5174/**` and your production origin |
+
+The app requests a redirect back to `<origin>/admin`, so that path must be
+covered by an entry here or the round-trip fails at the last step.
+
+**4. Grant the role.** OAuth authenticates; it does not authorise. A brand-new
+Google user has no `admin_users` row and lands on the *Not authorised* screen,
+which now displays the user ID so it can be pasted straight into the grant.
+
+#### One Google account is not one user
+
+Signing in with Google creates a **new `auth.users` row with a new ID**, even
+when the email matches an existing password account exactly. The `admin_users`
+grant is keyed on `user_id`, so an account authorised under one provider is
+*not* authorised under the other.
+
+The symptom is confusing: you are clearly signed in, the email is right, and
+the panel still refuses you. Check for duplicates before assuming the grant
+failed:
+
+```sql
+select id, email, raw_app_meta_data->>'provider' as provider from auth.users;
+```
+
+Either grant both IDs, or pick one provider and use it consistently. The *Not
+authorised* screen shows which provider the current session used, so the
+mismatch is visible rather than mysterious.
+
 ## Adding a round by hand
 
 The correct path until the collector's coverage improves.

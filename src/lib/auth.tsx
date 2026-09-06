@@ -78,15 +78,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isEditor: role !== null,
       isAdmin: role === 'ADMIN' || role === 'SUPER_ADMIN',
-      isSuperAdmin: role === 'SUPER_ADMIN',
-      signInWithGoogle: async () => {
+      isSuperAdmin: role === 'SUPER_ADMIN',      signInWithGoogle: async () => {
         if (!supabase) throw new Error('Supabase is not configured.');
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: { redirectTo },
         });
         if (error) throw error;
-      },      signInWithEmail: async (email: string) => {
+      },
+      signInWithEmail: async (email: string) => {
         if (!supabase) throw new Error('Supabase is not configured.');
         const { error } = await supabase.auth.signInWithOtp({
           email,

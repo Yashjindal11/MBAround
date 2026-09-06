@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { isSupabaseConfigured } from '../../lib/supabase';
@@ -13,8 +13,48 @@ const ADMIN_NAV = [
   { to: '/admin/audit', label: 'Audit Log' },
 ];
 
+/**
+ * Extracts an OAuth failure from a callback URL's query string and fragment.
+ *
+ * Exported for testing: the fragment case in particular is easy to get wrong
+ * and impossible to notice, because the symptom is a sign-in form that looks
+ * completely normal.
+ */
+export function parseOAuthError(search: string, hash: string): string | null {
+  const q = new URLSearchParams(search.replace(/^\?/, ''));
+  // Implicit-flow errors arrive in the fragment, not the query string.
+  const h = new URLSearchParams(hash.replace(/^#/, ''));
+  const code = q.get('error') ?? h.get('error');
+  if (!code) return null;
+  const description = q.get('error_description') ?? h.get('error_description');
+  // URLSearchParams decodes %20 but leaves '+' alone, and Supabase encodes
+  // spaces as '+' here.
+  return (description ?? code).replace(/\+/g, ' ');
+}
+
+/**
+ * Reads an OAuth failure out of the callback URL.
+ *
+ * A failed OAuth round-trip redirects back to /admin with the reason in the
+ * query string or the hash fragment, then the app renders a plain sign-in form
+ * as though nothing happened. Without this the most common setup mistakes -
+ * an unlisted redirect URI, a disabled provider - are completely silent.
+ */
+function useOAuthError(): string | null {
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const found = parseOAuthError(window.location.search, window.location.hash);
+    if (!found) return;
+    setError(found);
+    // Clear it so a reload does not resurrect a stale error.
+    window.history.replaceState({}, '', window.location.pathname);
+  }, []);
+  return error;
+}
+
 function SignIn() {
   const { signInWithGoogle, signInWithEmail, signInWithPassword } = useAuth();
+  const oauthError = useOAuthError();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // Password is the default because the project-wide auth mail rate limit
@@ -114,9 +154,7 @@ function SignIn() {
               ? 'Use an email sign-in link instead'
               : 'Sign in with a password instead'}
           </button>
-        )}
-
-        {error && (
+        )}        {error && (
           <p role="alert" className="mt-4 text-xs text-red-600 dark:text-red-400">
             {error}
             {/* The rate limit is per project, not per address, so retrying
@@ -126,6 +164,16 @@ function SignIn() {
                 This limit applies to the whole project. Use password sign-in instead.
               </span>
             )}
+          </p>
+        )}
+
+        {oauthError && !error && (
+          <p role="alert" className="mt-4 text-xs text-red-600 dark:text-red-400">
+            Google sign-in failed: {oauthError}
+            <span className="mt-1 block text-ink-500">
+              Check that the Google provider is enabled in Supabase and that{' '}
+              <code>{window.location.origin}/admin</code> is listed as a redirect URL.
+            </span>
           </p>
         )}
 
@@ -139,18 +187,27 @@ function SignIn() {
 
 function NotAuthorised() {
   const { user, signOut } = useAuth();
+  const provider = user?.app_metadata?.provider ?? 'unknown';
   return (
     <div className="container-page flex min-h-[70vh] items-center justify-center py-16">
       <div className="surface w-full max-w-md p-7 text-center">
         <h1 className="font-display text-xl font-semibold">Not authorised</h1>
         <p className="mt-2 text-sm text-ink-600">
-          You are signed in as <strong>{user?.email}</strong>, but this account has
-          no MBAround admin role.
+          You are signed in as <strong>{user?.email}</strong> via {provider}, but
+          this account has no MBAround admin role.
         </p>
-        <p className="mt-3 rounded-lg bg-ink-50 px-3 py-2.5 text-left text-2xs leading-relaxed text-ink-600">
-          A super admin must add your user ID to the <code>admin_users</code> table.
+        <p className="mt-3 rounded-lg bg-ink-50 px-3 py-2.5 text-left text-2xs leading-relaxed text-ink-600 dark:bg-ink-100">
+          A super admin must add this user ID to the <code>admin_users</code> table.
           Signing in with Google alone does not grant access.
         </p>
+        {/* The ID is shown because the grant is keyed on it, and looking it up
+            otherwise means digging through the Supabase dashboard. Signing in
+            with a different provider creates a different ID, so an account that
+            was granted access under one provider is not authorised under
+            another - showing both makes that mismatch visible. */}
+        <code className="mt-2 block select-all break-all rounded-lg bg-ink-100 px-3 py-2 text-left text-2xs text-ink-700">
+          {user?.id}
+        </code>
         <button onClick={signOut} className="btn-secondary mt-5 w-full">Sign out</button>
       </div>
     </div>
