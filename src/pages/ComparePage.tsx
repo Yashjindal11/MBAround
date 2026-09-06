@@ -1,0 +1,202 @@
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useAsync } from '../lib/useAsync';
+import { getDeadlines, getSchools } from '../lib/queries/public';
+import { compareRounds, formatDateShort } from '../lib/dates';
+import { EmptyState } from '../components/States';
+import { VerificationBadge } from '../components/VerificationBadge';
+import { verificationState } from '../lib/dates';
+import type { DeadlineRow, School } from '../lib/types';
+
+const MAX = 4;
+
+/**
+ * Comparison is generated entirely from database fields. There is no
+ * per-school comparison component — adding a school or a round changes this
+ * page automatically.
+ */
+export default function ComparePage() {
+  const [params, setParams] = useSearchParams();
+  const initial = params.get('schools')?.split(',').filter(Boolean) ?? [];
+  const [slugs, setSlugs] = useState<string[]>(initial);
+
+  const { data: schools } = useAsync(() => getSchools(), []);
+  const { data: rows } = useAsync(() => getDeadlines({ includePast: true }), []);
+
+  const selected = useMemo(
+    () => (schools ?? []).filter((s) => slugs.includes(s.slug)),
+    [schools, slugs],
+  );
+
+  const update = (next: string[]) => {
+    setSlugs(next);
+    if (next.length) setParams({ schools: next.join(',') });
+    else setParams({});
+  };
+
+  const toggle = (slug: string) =>
+    update(
+      slugs.includes(slug)
+        ? slugs.filter((s) => s !== slug)
+        : slugs.length < MAX
+          ? [...slugs, slug]
+          : slugs,
+    );
+
+  return (
+    <div className="container-page py-12">
+      <header className="max-w-2xl">
+        <p className="label-caps">Side by side</p>
+        <h1 className="mt-1.5 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+          Compare
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-ink-600">
+          Choose up to {MAX} schools to compare their programmes, application
+          rounds and decision dates.
+        </p>
+      </header>
+
+      <div className="surface mt-8 p-5">
+        <p className="label-caps mb-3">Select schools ({slugs.length}/{MAX})</p>
+        <div className="flex flex-wrap gap-2">
+          {(schools ?? []).map((s) => {
+            const on = slugs.includes(s.slug);
+            return (
+              <button
+                key={s.id}
+                onClick={() => toggle(s.slug)}
+                disabled={!on && slugs.length >= MAX}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+                  on
+                    ? 'border-ink-900 bg-ink-900 text-white'
+                    : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400'
+                }`}
+              >
+                {s.shortName ?? s.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-8">
+        {selected.length === 0 ? (
+          <EmptyState
+            title="Nothing selected yet"
+            description="Pick two or more schools above to see them side by side."
+          />
+        ) : (
+          <CompareTable schools={selected} rows={rows ?? []} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CompareTable({ schools, rows }: { schools: School[]; rows: DeadlineRow[] }) {
+  const forSchool = (id: string) => rows.filter((r) => r.schoolId === id);
+  /** Union of round names across the selection — never a fixed R1/R2/R3 list. */
+  const roundNames = useMemo(() => {
+    const names = new Map<string, number>();
+    for (const s of schools) {
+      for (const r of rows.filter((row) => row.schoolId === s.id)) {
+        if (!names.has(r.roundName)) names.set(r.roundName, r.roundOrder);
+      }
+    }
+    return [...names.entries()]
+      .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
+      .map(([name]) => name);
+  }, [schools, rows]);
+
+  const cell = 'border-l border-ink-100 px-4 py-3 align-top text-sm';
+
+  const rowsSpec: { label: string; render: (s: School) => React.ReactNode }[] = [
+    { label: 'Location', render: (s) => [s.city, s.country].filter(Boolean).join(', ') },
+    {
+      label: 'Programmes',
+      render: (s) => {
+        const names = [...new Set(forSchool(s.id).map((r) => r.programName))];
+        return names.length ? names.join(', ') : '—';
+      },
+    },    {
+      label: 'Application cycle',
+      render: (s) => {
+        const names = [...new Set(forSchool(s.id).map((r) => r.cycleName))];
+        return names.length ? names.join(', ') : '—';
+      },
+    },
+    {
+      label: 'Official links',
+      render: (s) => (
+        <div className="space-y-1">
+          {s.websiteUrl && (
+            <a href={s.websiteUrl} target="_blank" rel="noreferrer"
+              className="block text-accent-700 underline underline-offset-2">Website →</a>
+          )}
+          {s.admissionsUrl && (
+            <a href={s.admissionsUrl} target="_blank" rel="noreferrer"
+              className="block text-accent-700 underline underline-offset-2">Admissions →</a>
+          )}
+          {!s.websiteUrl && !s.admissionsUrl && '—'}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="surface overflow-x-auto">
+      <table className="w-full min-w-[40rem]">
+        <thead>
+          <tr className="border-b border-ink-200 bg-ink-50/60">
+            <th className="w-40 px-4 py-3 text-left label-caps">Attribute</th>
+            {schools.map((s) => (
+              <th key={s.id} className="border-l border-ink-100 px-4 py-3 text-left">
+                <span className="text-sm font-semibold text-ink-900">{s.name}</span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-ink-100">
+          {rowsSpec.map((spec) => (
+            <tr key={spec.label}>
+              <th className="px-4 py-3 text-left align-top label-caps">{spec.label}</th>
+              {schools.map((s) => (
+                <td key={s.id} className={cell}>{spec.render(s)}</td>
+              ))}
+            </tr>
+          ))}
+
+          {roundNames.map((name) => (
+            <tr key={name}>
+              <th className="px-4 py-3 text-left align-top label-caps">{name}</th>
+              {schools.map((s) => {
+                const r = forSchool(s.id)
+                  .filter((x) => x.roundName === name)
+                  .sort(compareRounds)[0];
+                return (
+                  <td key={s.id} className={cell}>
+                    {!r ? (
+                      <span className="text-ink-400">Not offered</span>
+                    ) : (
+                      <div className="space-y-1">
+                        <p className="font-medium text-ink-900">
+                          {r.deadline ? formatDateShort(r.deadline) : 'Not announced'}
+                        </p>
+                        {r.decisionDate && (
+                          <p className="text-2xs text-ink-500">
+                            Decision {formatDateShort(r.decisionDate)}
+                          </p>
+                        )}
+                        <VerificationBadge state={verificationState(r)} />
+                      </div>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
