@@ -11,7 +11,16 @@ import {
 import { EmptyState, ErrorState, LoadingState } from '../components/States';
 import { VerificationBadge } from '../components/VerificationBadge';
 import { ScopeRail, useSchoolScope } from '../components/SchoolScope';
+import { useSeo } from '../lib/seo';
+import { breadcrumbSchema } from '../lib/structuredData';
 import type { DeadlineRow, School } from '../lib/types';
+
+const TIMELINE_JSONLD = [
+  breadcrumbSchema([
+    { name: 'Home', path: '/' },
+    { name: 'Timeline', path: '/timeline' },
+  ]),
+];
 
 /**
  * Timeline built from whatever rounds exist - any number, any names.
@@ -43,6 +52,14 @@ export default function TimelinePage() {
   const scope = useSchoolScope(allSchools, allRows);
 
   const isSelected = (slug: string) => !deselected.includes(slug);
+
+  useSeo({
+    title: 'MBA Application Timeline & Deadline Calendar',
+    description:
+      'See MBA application deadlines laid out month by month across schools, so overlapping rounds and crowded weeks are visible before you commit to a plan.',
+    path: '/timeline',
+    jsonLd: TIMELINE_JSONLD,
+  });
 
   const toggle = (slug: string) =>
     setDeselected((prev) =>

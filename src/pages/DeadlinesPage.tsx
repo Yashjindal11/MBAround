@@ -5,6 +5,15 @@ import { getDeadlines, getFilterFacets, type DeadlineFilters } from '../lib/quer
 import { DeadlineCard } from '../components/Cards';
 import { FilterBar, FilterGroup, SearchInput } from '../components/Filters';
 import { EmptyState, ErrorState, LoadingState } from '../components/States';
+import { useSeo } from '../lib/seo';
+import { breadcrumbSchema } from '../lib/structuredData';
+
+const DEADLINES_JSONLD = [
+  breadcrumbSchema([
+    { name: 'Home', path: '/' },
+    { name: 'Deadlines', path: '/deadlines' },
+  ]),
+];
 
 type Sort = NonNullable<DeadlineFilters['sort']>;
 
@@ -60,11 +69,21 @@ export default function DeadlinesPage() {
   const activeCount =
     countries.length + regions.length + programTypes.length +
     cycleNames.length + roundNames.length + (from ? 1 : 0) + (to ? 1 : 0);
-
   const clearAll = () => {
     setCountries([]); setRegions([]); setProgramTypes([]);
     setCycleNames([]); setRoundNames([]); setFrom(''); setTo('');
   };
+
+  // Filtered permutations are noindex/follow: same content, re-sliced. See
+  // SchoolsPage for the reasoning.
+  useSeo({
+    title: 'MBA Application Deadlines by Round',
+    description:
+      'Every upcoming MBA application deadline in one place, with the round it belongs to and a link to the official source. Filter by country, region, programme type and round.',
+    path: '/deadlines',
+    noindex: activeCount > 0 || debouncedSearch.length > 0,
+    jsonLd: DEADLINES_JSONLD,
+  });
 
   return (
     <div className="container-page py-12">

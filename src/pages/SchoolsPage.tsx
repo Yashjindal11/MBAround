@@ -6,6 +6,8 @@ import { nextUpcoming } from '../lib/dates';
 import { SchoolCard } from '../components/Cards';
 import { FilterBar, FilterGroup, SearchInput } from '../components/Filters';
 import { EmptyState, ErrorState, LoadingState } from '../components/States';
+import { useSeo } from '../lib/seo';
+import { breadcrumbSchema, itemListSchema } from '../lib/structuredData';
 
 type Sort = 'default' | 'name' | 'country' | 'deadline';
 
@@ -66,8 +68,46 @@ export default function SchoolsPage() {
       setter((prev) =>
         prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
       );
-
   const activeCount = countries.length + regions.length;
+
+  /**
+   * Filtered views are noindex. /schools?region=Europe&country=France is the
+   * same content re-sliced, and letting hundreds of permutations into the index
+   * splits ranking signals across near-duplicates and burns crawl budget that
+   * should go to school pages. "follow" is kept so crawlers still reach those
+   * pages through these links.
+   */
+  const isFiltered = activeCount > 0 || debouncedSearch.length > 0;
+
+  const listJsonLd = useMemo(
+    () => [
+      breadcrumbSchema([
+        { name: 'Home', path: '/' },
+        { name: 'Schools', path: '/schools' },
+      ]),
+      ...(sorted.length
+        ? [
+            itemListSchema(
+              sorted.slice(0, 50).map((s) => ({
+                name: s.name,
+                path: `/schools/${s.slug}`,
+              })),
+              'MBA business schools',
+            ),
+          ]
+        : []),
+    ],
+    [sorted],
+  );
+
+  useSeo({
+    title: 'MBA Business Schools Directory',
+    description:
+      'Browse MBA programmes at business schools worldwide. Filter by region and country, and see the next application deadline for each — sourced from official admissions pages.',
+    path: '/schools',
+    noindex: isFiltered,
+    jsonLd: listJsonLd,
+  });
 
   return (
     <div className="container-page py-12">

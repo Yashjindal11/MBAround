@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAsync } from '../lib/useAsync';
 import {
   getDeadlinesForSchool,
@@ -10,6 +10,8 @@ import { countdownLabel, formatDate, formatDateShort, verificationState } from '
 import { ProvenanceLine, VerificationBadge } from '../components/VerificationBadge';
 import { LocationLine } from '../components/Cards';
 import { EmptyState, ErrorState, LoadingState } from '../components/States';
+import { useSeo } from '../lib/seo';
+import { breadcrumbSchema, schoolSchema } from '../lib/structuredData';
 import type { DeadlineRow } from '../lib/types';
 
 /**
@@ -51,21 +53,6 @@ export function InformationField({
       {hint && <p className="mt-0.5 text-2xs text-ink-500">{hint}</p>}
     </div>
   );
-}
-
-function useDocumentTitle(title: string, description?: string) {
-  useEffect(() => {
-    document.title = title;
-    if (description) {
-      let tag = document.querySelector('meta[name="description"]');
-      if (!tag) {
-        tag = document.createElement('meta');
-        tag.setAttribute('name', 'description');
-        document.head.appendChild(tag);
-      }
-      tag.setAttribute('content', description);
-    }
-  }, [title, description]);
 }
 
 function RoundsTable({ rows }: { rows: DeadlineRow[] }) {
@@ -178,11 +165,47 @@ export default function SchoolDetailPage() {
     () => (rows ?? []).filter((r) => r.programId === activeProgramId),
     [rows, activeProgramId],
   );
+  /**
+   * Metadata is derived from what the page can actually prove. The description
+   * names the rounds that are announced and says so plainly when none are,
+   * rather than promising dates the page does not have — a snippet that
+   * over-promises earns a click and then a bounce, which search engines read
+   * as the result being wrong.
+   */
+  const announced = (rows ?? []).filter((r) => r.isAnnounced && r.deadline);
+  const seoDescription = school
+    ? announced.length > 0
+      ? `${school.name} MBA application deadlines for ${announced.length} announced round${
+          announced.length === 1 ? '' : 's'
+        }, sourced from the school's official admissions page. Location: ${school.city}, ${school.country}.`
+      : `${school.name} MBA application rounds and programme details. ${school.city}, ${school.country}. Deadlines are published here as soon as the school announces them.`
+    : '';
 
-  useDocumentTitle(
-    school ? `${school.name} — MBA deadlines | MBAround` : 'School | MBAround',
-    school?.description ?? undefined,
+  const jsonLd = useMemo(
+    () =>
+      school
+        ? [
+            schoolSchema(school, rows ?? []),
+            breadcrumbSchema([
+              { name: 'Home', path: '/' },
+              { name: 'Schools', path: '/schools' },
+              { name: school.name, path: `/schools/${school.slug}` },
+            ]),
+          ]
+        : [],
+    [school, rows],
   );
+
+  useSeo({
+    title: school ? `${school.name} MBA Deadlines & Rounds` : 'School',
+    description: seoDescription,
+    path: `/schools/${slug}`,
+    type: 'article',
+    // A missing school is a 404 in all but HTTP status; letting it into the
+    // index would put a dead end in search results.
+    noindex: !school,
+    jsonLd,
+  });
 
   if (loading) return <div className="container-page py-12"><LoadingState rows={3} /></div>;
   if (error) return <div className="container-page py-12"><ErrorState error={error} onRetry={reload} /></div>;

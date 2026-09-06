@@ -8,6 +8,39 @@ import {
 } from '../lib/queries/public';
 import { DeadlineCard, SchoolCard } from '../components/Cards';
 import { EmptyState, ErrorState, LoadingState } from '../components/States';
+import { useSeo } from '../lib/seo';
+import { organizationSchema, websiteSchema, faqSchema } from '../lib/structuredData';
+
+/**
+ * Module-level constant so the array identity is stable; useSeo depends on it,
+ * and rebuilding it each render would rewrite every meta tag on every render.
+ *
+ * The FAQ answers below are the same claims the page and /data-sources make.
+ * Google requires FAQ markup to match visible content, and asserting sourcing
+ * guarantees in metadata that the site does not honour would be worse than
+ * having no markup at all.
+ */
+const HOME_JSONLD = [
+  organizationSchema(),
+  websiteSchema(),
+  faqSchema([
+    {
+      question: 'Where do MBAround deadlines come from?',
+      answer:
+        "Every deadline is read from the school's own admissions page and stored with a link to that source. MBAround does not use forums, aggregators or last year's dates.",
+    },
+    {
+      question: 'What happens when a school has not announced its dates?',
+      answer:
+        'The round is shown as not yet announced with no date attached. MBAround never estimates or carries forward a previous cycle’s deadline.',
+    },
+    {
+      question: 'Do all business schools use three application rounds?',
+      answer:
+        'No. Some run three rounds, others four, and others admit on a rolling basis. MBAround renders whatever structure each school actually publishes.',
+    },
+  ]),
+];
 
 function SectionHeader({
   eyebrow,
@@ -201,6 +234,14 @@ function Rounds() {
 }
 
 export default function HomePage() {
+  useSeo({
+    title: 'MBA Deadlines & Application Rounds, Sourced From Schools',
+    description:
+      'Track MBA application deadlines and rounds across top business schools worldwide. Every date links to the official admissions page it came from — nothing is estimated.',
+    path: '/',
+    jsonLd: HOME_JSONLD,
+  });
+
   return (
     <>
       <Hero />

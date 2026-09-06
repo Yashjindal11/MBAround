@@ -2,6 +2,15 @@ import { useState } from 'react';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { useAsync } from '../lib/useAsync';
 import { getSchools } from '../lib/queries/public';
+import { useSeo } from '../lib/seo';
+import { breadcrumbSchema } from '../lib/structuredData';
+
+const SUGGEST_JSONLD = [
+  breadcrumbSchema([
+    { name: 'Home', path: '/' },
+    { name: 'Suggest an update', path: '/suggest' },
+  ]),
+];
 
 /**
  * Public correction form. Anonymous users may INSERT a PENDING suggestion
@@ -41,6 +50,16 @@ export default function SuggestPage() {
       setBusy(false);
     }
   };
+
+  // Declared before the `sent` early return: hooks must run in the same order
+  // on every render, and a return above this would skip it.
+  useSeo({
+    title: 'Suggest a Deadline Correction',
+    description:
+      'Spotted a missing or out-of-date MBA deadline? Send the official admissions page it appears on and an editor will verify it against the source.',
+    path: '/suggest',
+    jsonLd: SUGGEST_JSONLD,
+  });
 
   if (sent) {
     return (

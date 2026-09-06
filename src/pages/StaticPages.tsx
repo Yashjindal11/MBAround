@@ -1,6 +1,35 @@
 import { Link } from 'react-router-dom';
+import { useSeo } from '../lib/seo';
+import { breadcrumbSchema } from '../lib/structuredData';
 
-function Page({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * The shared shell owns metadata so a new static page cannot ship without it.
+ * Each caller passes the `path` and `description` it is served at; deriving
+ * them from the URL would silently give every page the same description.
+ */
+function Page({
+  title,
+  path,
+  description,
+  children,
+}: {
+  title: string;
+  path: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  useSeo({
+    title,
+    description,
+    path,
+    jsonLd: [
+      breadcrumbSchema([
+        { name: 'Home', path: '/' },
+        { name: title, path },
+      ]),
+    ],
+  });
+
   return (
     <div className="container-page py-12">
       <div className="mx-auto max-w-2xl">
@@ -13,7 +42,11 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
 
 export function AboutPage() {
   return (
-    <Page title="About MBAround">
+    <Page
+      title="About MBAround"
+      path="/about"
+      description="MBAround helps applicants find MBA programmes and plan around application rounds, with every deadline traced back to the school's own admissions page."
+    >
       <p>
         MBAround is a structured reference for MBA programmes and their application
         rounds. The goal is narrow and deliberate: make it fast to find out when a
@@ -39,7 +72,11 @@ export function AboutPage() {
 
 export function DataSourcesPage() {
   return (
-    <Page title="Data sources">
+    <Page
+      title="Data sources"
+      path="/data-sources"
+      description="How MBAround sources MBA deadlines: official school admissions pages only, each round stored with its source URL, and no estimated or carried-forward dates."
+    >
       <h2 className="font-display text-lg font-semibold text-ink-900">
         Canonical deadline data
       </h2>
@@ -84,7 +121,11 @@ export function DataSourcesPage() {
 
 export function PrivacyPage() {
   return (
-    <Page title="Privacy">
+    <Page
+      title="Privacy"
+      path="/privacy"
+      description="MBAround's privacy approach: what the site stores, what it does not collect, and how suggestion submissions are handled."
+    >
       <p>
         MBAround does not require an account to browse. We do not sell personal data.
       </p>
@@ -102,7 +143,11 @@ export function PrivacyPage() {
 
 export function TermsPage() {
   return (
-    <Page title="Terms">
+    <Page
+      title="Terms"
+      path="/terms"
+      description="Terms of use for MBAround, including the limits of the deadline data published here and why applicants should always confirm with the school."
+    >
       <p>
         MBAround is an independent reference tool and is not affiliated with,
         endorsed by, or partnered with any school listed.

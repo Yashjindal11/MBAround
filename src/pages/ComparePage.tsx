@@ -7,7 +7,16 @@ import { EmptyState } from '../components/States';
 import { VerificationBadge } from '../components/VerificationBadge';
 import { ScopeRail, useSchoolScope } from '../components/SchoolScope';
 import { verificationState } from '../lib/dates';
+import { useSeo } from '../lib/seo';
+import { breadcrumbSchema } from '../lib/structuredData';
 import type { DeadlineRow, School } from '../lib/types';
+
+const COMPARE_JSONLD = [
+  breadcrumbSchema([
+    { name: 'Home', path: '/' },
+    { name: 'Compare', path: '/compare' },
+  ]),
+];
 
 const MAX = 4;
 
@@ -39,7 +48,6 @@ export default function ComparePage() {
     if (next.length) setParams({ schools: next.join(',') });
     else setParams({});
   };
-
   const toggle = (slug: string) =>
     update(
       slugs.includes(slug)
@@ -48,6 +56,16 @@ export default function ComparePage() {
           ? [...slugs, slug]
           : slugs,
     );
+
+  // ?schools=a,b is user-specific state, not a distinct page worth indexing.
+  useSeo({
+    title: 'Compare MBA Programmes Side by Side',
+    description:
+      'Compare MBA programmes across business schools — application rounds, deadlines, decision dates and locations, side by side in one table.',
+    path: '/compare',
+    noindex: slugs.length > 0,
+    jsonLd: COMPARE_JSONLD,
+  });
 
   return (
     <div className="container-page py-12">
