@@ -19,10 +19,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import 'dotenv/config';
 
-const SITE_URL = (process.env.VITE_SITE_URL ?? 'https://mbaround.jindalyash.com').replace(
-  /\/$/,
-  '',
-);
+const SITE_URL = (process.env.VITE_SITE_URL ?? 'https://gobizschool.com').replace(/\/$/, '');
 const OUT_DIR = path.resolve(process.cwd(), 'dist');
 
 /**

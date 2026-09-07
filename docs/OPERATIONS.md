@@ -290,7 +290,7 @@ Secrets**, for the Production environment:
 | --- | --- |
 | `VITE_SUPABASE_URL` | `https://wcrlkdeettpmamlgmpcv.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | the publishable key from Supabase → Settings → API |
-| `VITE_SITE_URL` | `https://mbaround.jindalyash.com` |
+| `VITE_SITE_URL` | `https://gobizschool.com` |
 
 These are read at *build* time, not run time. Vite inlines `VITE_*` values
 into the bundle, so **changing them requires a redeploy**, not just a restart.

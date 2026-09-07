@@ -46,7 +46,7 @@ export function siteOrigin(): string {
   // guess: it keeps canonicals correct on preview deploys and custom domains
   // even when VITE_SITE_URL was not set at build time.
   if (typeof window !== 'undefined') return window.location.origin;
-  return 'https://mbaround.jindalyash.com';
+  return 'https://gobizschool.com';
 }
 
 export function absoluteUrl(path: string): string {

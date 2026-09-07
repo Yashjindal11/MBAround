@@ -1,16 +1,17 @@
 /**
  * The deployed origin must be stated once and only once.
  *
- * robots.txt used to live in public/ with a hardcoded
- * "Sitemap: https://mbaround.com/sitemap.xml". On any other domain - a custom
- * subdomain, a preview deploy - that line sends crawlers to a host that does
+ * robots.txt used to live in public/ with a hardcoded Sitemap line naming a
+ * fixed domain. On any other host - a custom subdomain, a preview deploy, or
+ * simply a change of domain - that line sends crawlers to a host that does
  * not serve this site, and the real sitemap is never read. Nothing visibly
  * breaks, which is exactly why it needs a test.
  *
- * It is now generated from VITE_SITE_URL alongside the sitemap, so the two
- * cannot disagree.
+ * The site has now moved domains twice, which is the point: these tests
+ * assert that the origin is *derived*, never spelled out, so a third move is
+ * one environment variable rather than a hunt through the source.
  *
- * These assert the generator's source rather than executing it: running it
+ * They check the generator's source rather than executing it: running it
  * requires network access to Supabase, and a test that silently depends on a
  * live database is a test that fails for reasons unrelated to the code.
  */
@@ -71,5 +72,34 @@ describe('the app agrees with the build on the origin', () => {
     const appFallback = /return '(https:\/\/[^']+)';/.exec(seo)?.[1];
     expect(buildFallback).toBeDefined();
     expect(appFallback).toBe(buildFallback);
+  });
+
+  it('leaves no trace of a previously used domain', () => {
+    /*
+      Each move leaves the old domain behind in whatever file the search
+      missed, and a stale fallback is worse than an obviously wrong one: it
+      only surfaces when VITE_SITE_URL is unset, which is precisely the case
+      nobody tests before a deploy.
+
+      Checked across the files that can emit a URL. The dist/ directory is
+      build output and is excluded - it is regenerated, not edited.
+    */
+    const RETIRED = ['mbaround.com', 'jindalyash.com'];
+    const files = [
+      path.join('src', 'lib', 'seo.ts'),
+      path.join('scripts', 'generate-sitemap.ts'),
+      path.join('scripts', 'data', 'collect-deadlines.ts'),
+      path.join('public', 'index.html'),
+      'index.html',
+    ];
+
+    for (const rel of files) {
+      const full = path.join(ROOT, rel);
+      if (!existsSync(full)) continue;
+      const text = readFileSync(full, 'utf8');
+      for (const domain of RETIRED) {
+        expect(text, `${rel} still references the retired domain ${domain}`).not.toContain(domain);
+      }
+    }
   });
 });
