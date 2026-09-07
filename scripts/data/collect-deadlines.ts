@@ -257,7 +257,7 @@ async function fetchPage(url: string): Promise<string | null> {
     const res = await fetch(url, {
       headers: {
         'User-Agent':
-          'MBAroundBot/1.0 (+https://mbaround.com; deadline verification)',
+          'MBAroundBot/1.0 (+https://mbaround.jindalyash.com; deadline verification)',
         Accept: 'text/html',
       },
       signal: AbortSignal.timeout(20_000),

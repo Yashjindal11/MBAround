@@ -42,8 +42,11 @@ const MARK = 'data-seo';
 export function siteOrigin(): string {
   const configured = import.meta.env.VITE_SITE_URL as string | undefined;
   if (configured) return configured.replace(/\/+$/, '');
+  // In the browser the live origin is always right, and is preferred over any
+  // guess: it keeps canonicals correct on preview deploys and custom domains
+  // even when VITE_SITE_URL was not set at build time.
   if (typeof window !== 'undefined') return window.location.origin;
-  return 'https://mbaround.com';
+  return 'https://mbaround.jindalyash.com';
 }
 
 export function absoluteUrl(path: string): string {

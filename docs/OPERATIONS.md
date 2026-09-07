@@ -290,13 +290,20 @@ Secrets**, for the Production environment:
 | --- | --- |
 | `VITE_SUPABASE_URL` | `https://wcrlkdeettpmamlgmpcv.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | the publishable key from Supabase → Settings → API |
-| `VITE_SITE_URL` | the live origin, e.g. `https://mbaround.com` |
+| `VITE_SITE_URL` | `https://mbaround.jindalyash.com` |
 
 These are read at *build* time, not run time. Vite inlines `VITE_*` values
 into the bundle, so **changing them requires a redeploy**, not just a restart.
 
-`VITE_SITE_URL` only affects canonical URLs and `sitemap.xml`. If it is
-wrong, the site works but tells search engines the wrong address.
+`VITE_SITE_URL` must carry the scheme and no trailing slash. It sets the
+canonical URLs, `sitemap.xml` and the `Sitemap:` line in `robots.txt`, all of
+which are generated from it — so there is exactly one place to change the
+domain. Getting it wrong does not break the site; it quietly tells search
+engines the wrong address, which is harder to notice and slower to undo.
+
+Nothing else is required. There is no run-time secret: the anon key is
+publishable by design, and row-level security — not the client — decides what
+is visible.
 
 ### Why the build fails without them
 
