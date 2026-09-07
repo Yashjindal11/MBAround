@@ -16,3 +16,24 @@ directory = "./dist"
 # 404 on hard refresh or when a search engine crawls it - the client router
 # only exists once index.html has loaded.
 not_found_handling = "single-page-application"
+
+# Do NOT add public/_redirects or public/_routes.json.
+#
+# Both are Cloudflare *Pages* mechanisms. This project deploys as a Worker
+# with static assets, where `not_found_handling` above already performs the
+# SPA fallback natively.
+#
+# Shipping `/*  /index.html  200` alongside it fails the deploy outright:
+#
+#   Invalid _redirects configuration:
+#   Line 1: Infinite loop detected in this rule. This would cause a redirect
+#   to strip `.html` or `/index` and end up triggering this rule again.
+#
+# The rule rewrites every path to /index.html, which itself matches `/*`, so
+# the asset router sees a cycle. Under Pages the two never coexisted, so the
+# file was harmless until the deploy target changed - which is exactly why
+# the failure appeared without anyone touching the file.
+#
+# _routes.json is likewise a Pages-only concept: it told Pages Functions which
+# paths to invoke a Function for. There are no Functions here, and the Worker
+# assets runtime ignores it.
