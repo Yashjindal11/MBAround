@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { ConfigBanner, Footer, Header } from './components/Layout';
+import { Assistant } from './components/Assistant';
 import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './components/admin/AdminUI';
 import HomePage from './pages/HomePage';
@@ -79,11 +80,14 @@ function PublicShell({ children }: { children: React.ReactNode }) {
       <ConfigBanner />
       <Header />
       {/* tabIndex={-1} makes the target focusable so the skip link actually
-          moves focus, not just the scroll position. */}
-      <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
+          moves focus, not just the scroll position. */}      <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         {children}
       </main>
       <Footer />
+      {/* Rendered inside the public shell only: the admin area edits data
+          rather than looking it up, and a floating panel over a form is a
+          hindrance. It renders nothing when Supabase is unconfigured. */}
+      <Assistant />
     </div>
   );
 }
