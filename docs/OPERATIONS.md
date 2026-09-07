@@ -256,6 +256,31 @@ negative and will send you chasing a bug that does not exist; match
 
 ## Deploying to Cloudflare
 
+### If the deploy fails with "REFUSING TO BUILD"
+
+This is not a bug and there is nothing to fix in code. The build is
+deliberately refusing to publish a site that cannot reach the database.
+Set the three variables below and redeploy.
+
+You can confirm the diagnosis in about ten seconds, rather than reading
+code, by reproducing the Cloudflare conditions locally:
+
+```powershell
+# Fails, exactly as Cloudflare does: production branch, no credentials.
+$env:CF_PAGES_BRANCH='main'; $env:DOTENV_CONFIG_PATH='C:\nonexistent\.env'
+npm run build            # -> REFUSING TO BUILD, exit 1
+Remove-Item Env:CF_PAGES_BRANCH, Env:DOTENV_CONFIG_PATH
+
+# Succeeds: same branch, credentials present.
+$env:CF_PAGES_BRANCH='main'; npm run build   # -> Wrote 56 URLs, exit 0
+Remove-Item Env:CF_PAGES_BRANCH
+```
+
+If the second command succeeds, the code is fine and the deploy is missing
+environment variables. Note that in PowerShell `$env:X=''` *removes* a
+variable rather than blanking it, so pointing `DOTENV_CONFIG_PATH` at a
+nonexistent file is the reliable way to simulate "no credentials".
+
 ### Required environment variables
 
 Set both in the Cloudflare dashboard under **Settings → Variables and
