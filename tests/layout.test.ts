@@ -123,8 +123,7 @@ describe('calendar density', () => {
 
     // It must genuinely be an early return: the collapsed branch has to close
     // before the panel <section> is reached.
-    const earlyReturn = source.indexOf('if (month.rows.length === 0)');
-    const panel = source.indexOf("'panel overflow-hidden '");
+    const earlyReturn = source.indexOf('if (month.rows.length === 0)');    const panel = source.indexOf('<section');
     expect(earlyReturn).toBeGreaterThan(-1);
     expect(panel).toBeGreaterThan(earlyReturn);
   });
@@ -138,11 +137,44 @@ describe('calendar density', () => {
   it('falls back to rows for sparse months rather than a mostly-empty grid', () => {
     expect(source).toMatch(/density === 'grid' && month\.rows\.length > 2/);
   });
-
   it('labels the toggle "Auto", since it does not always render a grid', () => {
     // Calling it "Grid" while showing rows would be a small lie the user has
     // to reverse-engineer.
     expect(source).toMatch(/>\s*Auto\s*</);
     expect(source).not.toMatch(/>\s*Grid\s*</);
+  });
+});
+
+/**
+ * The day cells' hover cards are positioned `top-full`, so they are *meant*
+ * to extend past the cell - and for a cell in the month's last week, past the
+ * panel's bottom edge. An `overflow-hidden` anywhere on the ancestor chain
+ * clips them mid-render, which shows up as a black rectangle sliced off at
+ * the panel border rather than as a readable tooltip.
+ *
+ * This is invisible to the type checker and to every test that only reads
+ * data, so it is pinned here. The corner-rounding that `overflow-hidden` used
+ * to provide is handled by the one child that actually reaches a corner.
+ */
+describe('calendar hover cards are not clipped', () => {
+  const source = readFileSync(path.join(SRC, 'pages', 'TimelineV2Page.tsx'), 'utf8');
+
+  it('does not clip overflow on the month panel', () => {
+    // Any overflow-hidden in this file would sit on the hover card's ancestor
+    // chain, so the rule is simply that the file must not use it.
+    const uses = (source.match(/className=\{?['"`][^'"`]*overflow-hidden/g) ?? []).length;
+    expect(uses, 'overflow-hidden would clip the day-cell hover cards').toBe(0);
+  });
+
+  it('still rounds the corner that overflow-hidden used to cover', () => {
+    // The last list row's hover background is the only child reaching a
+    // corner; without this it squares off the panel's rounded bottom.
+    expect(source).toContain('last:rounded-b-2xl');
+  });
+
+  it('keeps the hover card above sibling cells', () => {
+    // Later cells paint over earlier ones without an explicit stacking order,
+    // so a card from row 1 would appear behind row 2.
+    expect(source).toMatch(/absolute[^'"`]*z-20/);
   });
 });

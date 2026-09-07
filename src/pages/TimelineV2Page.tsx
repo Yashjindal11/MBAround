@@ -315,17 +315,28 @@ export default function TimelineV2Page() {
                         </span>
                         <span className="text-3xs uppercase tracking-wide text-ink-400">
                           {isCurrent ? 'This month · nothing due' : 'Nothing due'}
-                        </span>
-                      </div>
+                        </span>                      </div>
                     );
                   }
 
                   return (
                     <section
                       key={month.key}
-                      className={
-                        'panel overflow-hidden ' + (isCurrent ? 'ring-1 ring-accent-400/70' : '')
-                      }
+                      /*
+                        Deliberately NOT `overflow-hidden`. The day cells'
+                        hover cards are positioned `top-full`, so they extend
+                        below the cell and, for cells in the last week, past
+                        the panel's own edge. Clipping the panel guillotined
+                        them mid-render - a black rectangle sliced off at the
+                        border.
+
+                        `overflow-hidden` was only there to stop square
+                        children squaring off the rounded corners, so the one
+                        child that reaches a corner rounds itself instead (see
+                        MonthList). Fixing the corner at the source costs one
+                        utility; clipping the panel costs every popover in it.
+                      */
+                      className={'panel ' + (isCurrent ? 'ring-1 ring-accent-400/70' : '')}
                     >
                       <div className="panel-head">
                         <div className="flex items-baseline gap-2.5">
@@ -488,8 +499,7 @@ function MonthList({ month }: { month: MonthBlock }) {
         return (
           <li
             key={r.roundId}
-            className={
-              'flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 transition-colors hover:bg-ink-50/60 ' +
+            className={              'flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 transition-colors last:rounded-b-2xl hover:bg-ink-50/60 ' +
               (past ? 'opacity-60' : '')
             }
           >
