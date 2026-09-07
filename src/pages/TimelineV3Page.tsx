@@ -211,7 +211,8 @@ export default function TimelineV3Page() {
           )}
 
           {dated.length > 0 && (
-            <>              {/* The single most useful fact on the page, stated plainly. */}
+            <>
+              {/* The single most useful fact on the page, stated plainly. */}
               {nextUp && (
                 <div className="panel mb-4 overflow-hidden">
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-4 border-l-[3px] border-l-accent-500 p-5">

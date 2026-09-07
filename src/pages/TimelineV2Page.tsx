@@ -252,24 +252,31 @@ export default function TimelineV2Page() {
                   {months.length} month{months.length === 1 ? '' : 's'} &middot; {dated.length}{' '}
                   deadline{dated.length === 1 ? '' : 's'}
                 </p>
-                {/* The grid is spatial; the list is scannable and reads better
-                    with a screen reader. Neither suits everyone, so both are
-                    one click apart. */}
+
+                {/*
+                  "Auto" rather than "Grid" because that is what it does: a
+                  month with one or two deadlines renders as rows, since a
+                  six-row day grid holding a single fact is mostly empty space.
+                  Labelling it "Grid" while showing rows would be a small lie
+                  the user has to work out for themselves.
+                */}
                 <div className="segmented">
                   <button
                     type="button"
                     onClick={() => setDensity('grid')}
                     aria-pressed={density === 'grid'}
+                    title="Day grid for busy months, rows for quiet ones"
                     className={
                       'segmented-item ' + (density === 'grid' ? 'segmented-item-active' : '')
                     }
                   >
-                    Grid
+                    Auto
                   </button>
                   <button
                     type="button"
                     onClick={() => setDensity('list')}
                     aria-pressed={density === 'list'}
+                    title="Always show full rows"
                     className={
                       'segmented-item ' + (density === 'list' ? 'segmented-item-active' : '')
                     }
@@ -279,10 +286,39 @@ export default function TimelineV2Page() {
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2.5">
                 {months.map((month) => {
                   const isCurrent = month.key === currentKey;
                   const load = busiest > 0 ? (month.rows.length / busiest) * 100 : 0;
+
+                  /*
+                    An empty month is a single fact - "nothing due" - and it
+                    was previously spending a full panel, a header, a zero
+                    width load bar and a padded paragraph to say it. Stacked
+                    across a quiet stretch of the cycle that is what made the
+                    calendar read as mostly blank. Collapse it to one line so
+                    the months that actually carry deadlines are what the eye
+                    lands on, while still keeping the month in sequence: the
+                    gaps between intakes are information too.
+                  */
+                  if (month.rows.length === 0) {
+                    return (
+                      <div
+                        key={month.key}
+                        className={
+                          'flex items-baseline justify-between rounded-lg border border-dashed border-ink-200/80 px-4 py-1.5 ' +
+                          (isCurrent ? 'ring-1 ring-accent-400/70' : '')
+                        }
+                      >
+                        <span className="font-display text-2xs font-medium text-ink-500">
+                          {month.label}
+                        </span>
+                        <span className="text-3xs uppercase tracking-wide text-ink-400">
+                          {isCurrent ? 'This month · nothing due' : 'Nothing due'}
+                        </span>
+                      </div>
+                    );
+                  }
 
                   return (
                     <section
@@ -298,13 +334,9 @@ export default function TimelineV2Page() {
                           </h2>
                           {isCurrent && <span className="pill-accent">This month</span>}
                         </div>
-                        {month.rows.length === 0 ? (
-                          <span className="shrink-0 text-2xs text-ink-400">Nothing due</span>
-                        ) : (
-                          <span className="pill-neutral tabular shrink-0">
-                            {month.rows.length} due
-                          </span>
-                        )}
+                        <span className="pill-neutral tabular shrink-0">
+                          {month.rows.length} due
+                        </span>
                       </div>
 
                       {/* Load bar, scaled against the busiest month in view. */}
@@ -315,13 +347,18 @@ export default function TimelineV2Page() {
                         />
                       </div>
 
-                      {month.rows.length === 0 ? (
-                        <p className="px-5 py-6 text-center text-2xs text-ink-400">
-                          No announced deadlines this month.
-                        </p>
-                      ) : density === 'grid' ? (
+                      {density === 'grid' && month.rows.length > 2 ? (
                         <MonthGrid month={month} />
                       ) : (
+                        /*
+                          A month with one or two deadlines does not justify a
+                          six-row day grid: that is ~35 empty cells rendered to
+                          carry a single fact, which is what made the calendar
+                          feel mostly empty. Below the threshold the rows say
+                          the same thing in a fraction of the height, and say
+                          it more precisely - full school and round names
+                          instead of a dot.
+                        */
                         <MonthList month={month} />
                       )}
                     </section>
@@ -338,7 +375,18 @@ export default function TimelineV2Page() {
   );
 }
 
-/** True day grid: position within the month carries meaning. */
+/**
+ * True day grid: position within the month carries meaning.
+ *
+ * Cells are square and small. An earlier version gave every cell a ~62px
+ * minimum height and printed the first word of each school name inside it,
+ * which meant a month with one deadline still rendered six rows of empty
+ * boxes - a large block of whitespace carrying a single fact - and "Northmoor
+ * Business School" appeared as "Northmoor" with no way to tell it apart from
+ * "Northmoor Executive". Names are unreliable at this size, so the cell now
+ * carries only a dot per deadline and the names live in the hover card and in
+ * the list view, both of which have room for them.
+ */
 function MonthGrid({ month }: { month: MonthBlock }) {
   return (
     <div className="p-3 sm:p-4">
@@ -346,7 +394,7 @@ function MonthGrid({ month }: { month: MonthBlock }) {
         {WEEKDAYS.map((d) => (
           <div
             key={d}
-            className="pb-1 text-center text-3xs font-medium uppercase tracking-wide text-ink-400"
+            className="pb-1.5 text-center text-3xs font-medium uppercase tracking-wide text-ink-400"
           >
             {d}
           </div>
@@ -362,61 +410,62 @@ function MonthGrid({ month }: { month: MonthBlock }) {
             <div
               key={cell.iso}
               className={
-                'group relative min-h-[3.9rem] rounded-lg border p-1.5 transition-colors ' +
+                'group relative flex h-11 flex-col items-center justify-center rounded-md border transition-colors ' +
                 (has
-                  ? 'border-accent-200 bg-accent-50/60 hover:border-accent-300'
+                  ? 'border-accent-300 bg-accent-50 hover:border-accent-400'
                   : cell.isWeekend
-                    ? 'border-transparent bg-ink-50/40'
-                    : 'border-transparent') +
+                    ? 'border-transparent bg-ink-50/50'
+                    : 'border-transparent hover:bg-ink-50/60') +
                 (cell.isToday ? ' ring-1 ring-accent-500' : '') +
-                (cell.isPast && !has ? ' opacity-50' : '')
+                (cell.isPast && !has ? ' opacity-40' : '')
               }
             >
-              <div className="flex items-center justify-between">
-                <span
-                  className={
-                    'tabular text-2xs ' +
-                    (cell.isToday
-                      ? 'font-semibold text-accent-700'
-                      : has
-                        ? 'font-medium text-ink-800'
-                        : 'text-ink-400')
-                  }
-                >
-                  {cell.day}
-                </span>
-                {count > 1 && (
-                  <span className="tabular rounded-full bg-accent-600 px-1.5 text-3xs font-semibold text-white">
-                    {count}
-                  </span>
-                )}
-              </div>
+              <span
+                className={
+                  'tabular text-2xs leading-none ' +
+                  (cell.isToday
+                    ? 'font-semibold text-accent-700'
+                    : has
+                      ? 'font-semibold text-ink-900'
+                      : 'text-ink-400')
+                }
+              >
+                {cell.day}
+              </span>
 
-              <div className="mt-1 space-y-0.5">
-                {cell.rows.slice(0, 2).map((r) => (
-                  <p
-                    key={r.roundId}
-                    title={`${r.schoolName} - ${r.programName} - ${r.roundName}`}
-                    className={
-                      'truncate text-3xs leading-tight ' +
-                      (cell.isPast ? 'text-ink-400' : 'text-ink-700')
-                    }
-                  >
-                    {r.schoolName.split(' ')[0]}
-                  </p>
-                ))}
-                {count > 2 && <p className="text-3xs text-ink-500">+{count - 2} more</p>}
-              </div>
-
-              {/* Full detail on hover: a grid cell is far too small to carry
-                  school, programme and round names legibly. */}
+              {/*
+                One dot per deadline, up to three, then a count. Dots convey
+                "how many" without needing to be read, which is the only thing
+                a cell this size can honestly communicate.
+              */}
               {has && (
-                <div className="pointer-events-none absolute left-1/2 top-full z-20 hidden w-56 -translate-x-1/2 translate-y-1 rounded-lg bg-ink-900 p-2.5 text-left shadow-lift group-hover:block">
+                <span className="mt-1 flex h-1.5 items-center gap-0.5">
+                  {count <= 3 ? (
+                    cell.rows.map((r) => (
+                      <span
+                        key={r.roundId}
+                        className={
+                          'h-1.5 w-1.5 rounded-full ' +
+                          (cell.isPast ? 'bg-ink-300' : 'bg-accent-500')
+                        }
+                      />
+                    ))
+                  ) : (
+                    <span className="tabular text-3xs font-semibold leading-none text-accent-700">
+                      {count}
+                    </span>
+                  )}
+                </span>
+              )}
+
+              {/* Detail on hover, where there is room to be unambiguous. */}
+              {has && (
+                <div className="pointer-events-none absolute left-1/2 top-full z-20 hidden w-60 -translate-x-1/2 translate-y-1 rounded-lg bg-ink-900 p-2.5 text-left shadow-lift group-hover:block">
                   <p className="text-3xs font-medium text-white/60">{formatDate(cell.iso)}</p>
                   {cell.rows.map((r) => (
                     <p key={r.roundId} className="mt-1 text-2xs leading-snug text-white">
                       {r.schoolName}
-                      <span className="text-white/60"> - {r.roundName}</span>
+                      <span className="text-white/60"> &middot; {r.roundName}</span>
                     </p>
                   ))}
                 </div>

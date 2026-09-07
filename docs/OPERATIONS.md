@@ -212,7 +212,7 @@ constraints, not application logic, so no client can bypass them.
 
 ```powershell
 npx tsc --noEmit     # 0 errors
-npx vitest run       # 128 tests across 11 files
+npx vitest run       # 155 tests across 13 files
 npx eslint .         # 0 errors (8 react-refresh warnings are expected)
 npm run build        # also regenerates the sitemap
 npm run db:verify    # the data the pages describe is really there
@@ -220,6 +220,39 @@ npm run db:verify    # the data the pages describe is really there
 
 The build regenerates `sitemap.xml` from the database, so a school added
 without a rebuild is absent from it.
+
+`npm run build` is the only step that reliably catches an empty or truncated
+module. `tsc` will happily type-check a 0-byte file — an empty module is valid
+TypeScript — and only Rollup fails it, with `"default" is not exported by ...`.
+Never treat a green `tsc` as proof a file was written.
+
+## When the dev server shows stale UI
+
+Tailwind's JIT compiler scans the files it knew about at startup. A component
+created *after* the dev server started can render with classes that were never
+compiled, so the markup is correct but the page looks broken — mis-sized cells,
+missing grids, no spacing. This is not a code bug and no amount of editing the
+component will fix it.
+
+Confirm before debugging anything else:
+
+```powershell
+# Is the server older than the file you are looking at?
+$p = (Get-NetTCPConnection -LocalPort 5174 -State Listen).OwningProcess | Select-Object -First 1
+Get-Process -Id $p | Select-Object Id, StartTime
+
+# Did the class actually make it into the served CSS?
+$c = (Invoke-WebRequest "http://localhost:5174/src/index.css" -UseBasicParsing).Content
+$c -match 'grid-cols-7'
+```
+
+If the class is missing from the served CSS but present in `dist/assets/*.css`
+after a build, the server is stale — restart it.
+
+Note that Tailwind escapes dots in generated class names, so `space-y-2.5`
+appears as `space-y-2\.5`. A naive `-match 'space-y-2\.5'` returns a false
+negative and will send you chasing a bug that does not exist; match
+`'space-y-2\\\.5'` instead.
 
 ## Deploying to Cloudflare
 

@@ -97,8 +97,52 @@ describe('timeline layout ordering', () => {
 
     const paths = [...match![1].matchAll(/path: '([^']+)'/g)].map((m) => m[1]);
     expect(paths[0]).toBe('/timeline/v2');
-    // All three must still be reachable; promoting one must not drop another.
-    expect(paths).toContain('/timeline');
+    // All three must still be reachable; promoting one must not drop another.    expect(paths).toContain('/timeline');
     expect(paths).toContain('/timeline/v3');
+  });
+});
+
+/**
+ * The calendar's density rules exist because the first version rendered a
+ * six-row day grid for every month in range. A month with no deadlines still
+ * cost a panel, a header, a zero-width load bar and a padded paragraph; a
+ * month with one deadline cost ~35 empty cells. Across a quiet stretch of the
+ * cycle the page read as mostly blank, which made it look broken rather than
+ * merely sparse.
+ *
+ * These pin the thresholds by shape, not by cosmetics: an empty month must
+ * return early and never reach the panel path, and the day grid must stay
+ * gated behind a row count. Restyling is free; silently reinstating a full
+ * panel for an empty month is not.
+ */
+describe('calendar density', () => {
+  const source = readFileSync(path.join(SRC, 'pages', 'TimelineV2Page.tsx'), 'utf8');
+
+  it('collapses an empty month instead of rendering a panel', () => {
+    expect(source).toMatch(/if \(month\.rows\.length === 0\) \{\s*return \(/);
+
+    // It must genuinely be an early return: the collapsed branch has to close
+    // before the panel <section> is reached.
+    const earlyReturn = source.indexOf('if (month.rows.length === 0)');
+    const panel = source.indexOf("'panel overflow-hidden '");
+    expect(earlyReturn).toBeGreaterThan(-1);
+    expect(panel).toBeGreaterThan(earlyReturn);
+  });
+
+  it('leaves no dead empty-state branch inside the panel', () => {
+    // Once the early return exists, the old in-panel empty state is
+    // unreachable; keeping it invites a later reader to treat it as live.
+    expect(source).not.toContain('No announced deadlines this month.');
+  });
+
+  it('falls back to rows for sparse months rather than a mostly-empty grid', () => {
+    expect(source).toMatch(/density === 'grid' && month\.rows\.length > 2/);
+  });
+
+  it('labels the toggle "Auto", since it does not always render a grid', () => {
+    // Calling it "Grid" while showing rows would be a small lie the user has
+    // to reverse-engineer.
+    expect(source).toMatch(/>\s*Auto\s*</);
+    expect(source).not.toMatch(/>\s*Grid\s*</);
   });
 });

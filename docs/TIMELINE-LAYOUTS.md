@@ -48,13 +48,44 @@ it has two structural weaknesses:
 
 **v2 (Calendar)** fixes the first with a real day grid, so position within the
 month carries meaning and a same-day collision is a visible cluster rather than
-overlapping dots. Empty months are still rendered so quiet stretches stay
-legible, and a load bar scaled to the busiest month shows density before a
+overlapping dots. A load bar scaled to the busiest month shows density before a
 single row is read.
 
 Grid cells are too small to carry school, programme and round names, so detail
 moves to hover in grid mode. A **list** toggle renders the same month as full
 rows — better for reading detail, and for screen readers.
+
+### Density: why the calendar is not always a grid
+
+The first version rendered a six-row day grid for *every* month in range. That
+made the page read as mostly blank, and the cause was not styling — it was that
+the grid's cost is fixed while the information it carries is not:
+
+- A month with **nothing due** still cost a panel, a header, a zero-width load
+  bar and a padded "nothing due" paragraph — four elements to state one fact.
+- A month with **one or two deadlines** cost ~35 empty cells to position a
+  single dot.
+
+So the calendar picks its rendering per month:
+
+| Deadlines in month | Rendering |
+| --- | --- |
+| 0 | One collapsed dashed line: month name + "Nothing due" |
+| 1–2 | `MonthList` rows — full school and round names |
+| 3+ | `MonthGrid` day grid |
+
+Empty months are **collapsed, not dropped**. The gaps between intakes are
+information: a three-month quiet stretch is something a planner needs to see.
+But it should cost one line, not a panel.
+
+The toggle is labelled **"Auto" / "List"**, not "Grid" / "List". Calling it
+"Grid" while it renders rows for a sparse month would be a small lie the user
+has to reverse-engineer.
+
+`tests/layout.test.ts` pins these thresholds by shape rather than cosmetics:
+the empty-month branch must be a genuine early return that precedes the panel
+path, and the grid must stay gated behind a row count. Restyling is free;
+silently reinstating a full panel for an empty month is not.
 
 **v3 (Agenda)** fixes the second by abandoning the spatial axis. Rounds are
 bucketed by urgency (closed / this week / this month / next 3 months / later)
