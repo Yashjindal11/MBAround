@@ -281,6 +281,57 @@ environment variables. Note that in PowerShell `$env:X=''` *removes* a
 variable rather than blanking it, so pointing `DOTENV_CONFIG_PATH` at a
 nonexistent file is the reliable way to simulate "no credentials".
 
+### If the deploy fails with "Invalid _redirects configuration"
+
+The full error is:
+
+```
+Invalid _redirects configuration:
+Line 1: Infinite loop detected in this rule. This would cause a redirect
+to strip `.html` or `/index` and end up triggering this rule again.
+```
+
+The cause is a `public/_redirects` file containing `/*  /index.html  200`.
+That is the Cloudflare **Pages** way of doing an SPA fallback. This project
+deploys as a **Worker with static assets**, where `wrangler.toml` already
+declares `not_found_handling = "single-page-application"`, so the explicit
+rule is both redundant and self-referential: it rewrites every path to
+`/index.html`, which itself matches `/*`.
+
+Fix: delete `public/_redirects`. Deep links keep working — the fallback is
+native. `public/_routes.json` is likewise Pages-only (it told Pages
+Functions which paths to invoke, and there are no Functions here).
+
+Note what this failure looks like from the outside: the deploy breaks with
+no corresponding code change. Both files predate `wrangler.toml` and were
+inert under Pages; they only became fatal when the deploy target changed.
+`tests/deploy-config.test.ts` now fails if either file reappears.
+
+`public/_headers` is **not** affected and must stay — it is supported by the
+assets runtime and carries the security headers, the immutable cache policy
+for `/assets/*`, and `no-store` + `noindex` for `/admin`.
+
+### Verifying a deploy from the outside
+
+Green build logs are not proof. Check the running site:
+
+```powershell
+# Generated robots.txt names the right host, and the sitemap agrees.
+(Invoke-WebRequest https://gobizschool.com/robots.txt -UseBasicParsing).Content
+
+# Deep links resolve on a cold hit rather than 404 (SPA fallback works).
+(Invoke-WebRequest https://gobizschool.com/schools/harvard-business-school `
+  -UseBasicParsing).StatusCode          # -> 200
+
+# Security headers from public/_headers are actually applied.
+(Invoke-WebRequest https://gobizschool.com/ -UseBasicParsing).Headers['x-frame-options']
+```
+
+If `robots.txt` names an old domain, compare the build's timestamp against
+the commit that changed the domain before assuming a bug — a build that
+started before the commit landed cannot contain it, and a redeploy is the
+whole fix.
+
 ### Required environment variables
 
 Set both in the Cloudflare dashboard under **Settings → Variables and
