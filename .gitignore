@@ -21,3 +21,7 @@ cycles.sql
 # -m arguments, so `git commit -F .commitmsg` is used instead; the file is
 # transient and must never be committed.
 .commitmsg
+
+# One-off privileged grant script; names a real account and is run by hand
+# in the SQL editor. Not a migration and not part of any build.
+grant-admin.sql

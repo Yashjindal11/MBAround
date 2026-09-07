@@ -25,19 +25,33 @@ reasons a visitor would see an empty page. That is not redundancy with
 
 ## Current live state
 
-Verified 7 September 2026:
+Verified 7 September 2026, after the 2026-27 round import:
 
 ```
 schools              46
 programs             49
 application_cycles   49
-application_rounds   0
+application_rounds  121   (120 dated, 1 undated, 0 verified)
 suggestions           write-only for anon; count not meaningful
 ```
 
-**Zero rounds is correct, not a bug.** No round has been entered because no
-deadline has been confirmed from an official source. See
-`DEADLINE-COLLECTION.md`.
+**Zero verified rounds is correct, not an oversight.** Every imported round
+carries `status = 'NEEDS_REVIEW'`, no `source_url`, and `is_verified = false`,
+because the import transcribed a compiled table rather than 121 official
+admissions pages. Verification is per-round and manual: open the school's own
+page, confirm the date, paste the exact URL. The `rounds_verified_requires_source`
+CHECK constraint makes it impossible to mark a round verified without one.
+
+Dates that were marked `(Est)` in the source were **excluded entirely** rather
+than imported and flagged — an estimated date is indistinguishable from a real
+one once it is in the table, and this project would rather show nothing than
+show a plausible guess. That is why ESADE, RSM, NUS, CEIBS, both IIMs and
+Melbourne have no rounds despite appearing in the source.
+
+One round is deliberately undated: IE runs `Rolling Admissions`, which has no
+deadline to record. HEC's rounds are named by date rather than round number,
+because that is how HEC publishes them — no view assumes a fixed R1/R2/R3
+sequence.
 
 ## Seeding order
 
@@ -70,7 +84,8 @@ silently discards the edit.
 A zero count has three distinct meanings, and they are not distinguishable
 without knowing the schema:
 
-1. **Genuinely empty** — `application_rounds` today.
+1. **Genuinely empty** — `application_rounds` was this until the 2026-27
+   import; `suggestions` is, whenever nobody has submitted a correction.
 2. **Present but hidden by RLS** — 49 cycles seeded as `DRAFT` counted as 0.
 3. **Write-only for anon** — `suggestions` always counts 0 regardless.
 

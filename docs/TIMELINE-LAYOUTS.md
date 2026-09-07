@@ -152,8 +152,17 @@ Collapsing these into one message would blame the user for an empty database.
 
 ## Sample data (`?demo=1`)
 
-`application_rounds` is currently empty, so all three layouts render nothing
-and cannot be evaluated.
+`application_rounds` held nothing until the 2026-27 import, so all three
+layouts rendered empty and could not be evaluated. It now holds 121 rounds
+(120 dated), which means the layouts can finally be judged on real data —
+including the awkward cases invented data never produces: a school whose
+rounds are named by date rather than number (HEC), a round with no deadline
+at all (IE's rolling admissions), and months carrying a dozen deadlines
+against months carrying none.
+
+The `?demo=1` reasoning below still stands and the flag is still worth
+keeping, because the database can legitimately be empty again — a new cycle
+year begins with no confirmed dates.
 
 **The fix is not to seed sample rounds.** A row in Supabase is
 indistinguishable from a real one: it flows into `/deadlines`, `/compare`, the

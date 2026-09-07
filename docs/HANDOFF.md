@@ -11,7 +11,7 @@ State as of 7 September 2026, commit `f5e4d06`, working tree clean, pushed to
 schools              46
 programs             49
 application_cycles   49
-application_rounds    0     <- correct, see below
+application_rounds  121     <- 120 dated, 1 undated, 0 verified
 suggestions           write-only for anon; count not meaningful
 ```
 
@@ -23,9 +23,16 @@ Auth providers on the live project: `google: true`, `email: true`.
 - `npm run build` clean, sitemap 56 URLs
 - `npm run db:verify` — all 12 live checks pass
 
-**Zero rounds is correct.** No deadline has been confirmed from an official
-source, so none has been entered. An empty deadlines page is an honest
-statement that we do not have the data.
+**Zero *verified* rounds is correct.** The 2026-27 import transcribed a
+compiled table, not 121 official admissions pages, so every round is
+`NEEDS_REVIEW` with no `source_url`. Verification is manual and per-round.
+Estimated `(Est)` dates were excluded outright rather than imported and
+flagged, because once a guess is in the table it is indistinguishable from a
+confirmed date.
+
+The import doubled as the first live exercise of write-side RLS, which had
+never been tested against real data: `db:verify` confirms anon still gets
+HTTP 401 inserting into `application_rounds`.
 
 ---
 
@@ -73,8 +80,12 @@ the current user ID and provider so the mismatch is visible.
 **This is the one thing I most want checked, and it cannot be done without
 the admin grant.**
 
-`application_rounds` insert/update has unit coverage but has **never executed
-against the live database**. The editor-insert RLS policies have never run.
+`application_rounds` insert/update has unit coverage. The **privileged** write
+path has now run: `rounds.sql` inserted 121 rounds through the SQL editor, and
+`db:verify` confirms anon is still refused (HTTP 401). What remains untested is
+the **editor** path — an authenticated non-superuser writing through the app,
+which is what the `is_editor()` RLS policies actually gate. That still cannot
+be exercised without the admin grant.
 
 That matters because three of the last four failures were RLS or trigger
 behaviour differing from what the code assumed, and *every one reported success
