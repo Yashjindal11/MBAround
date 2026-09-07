@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "seed:sql": "tsx scripts/data/emit-seed-sql.ts",
     "seed:cycles": "tsx scripts/data/emit-cycles-sql.ts",
+    "seed:rounds": "tsx scripts/data/emit-rounds-sql.ts",
     "seed:deadlines": "tsx scripts/data/collect-deadlines.ts",
     "db:probe": "tsx scripts/db-probe.ts",
     "db:verify": "tsx scripts/verify-live.ts"
