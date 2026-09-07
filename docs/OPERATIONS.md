@@ -212,7 +212,7 @@ constraints, not application logic, so no client can bypass them.
 
 ```powershell
 npx tsc --noEmit     # 0 errors
-npx vitest run       # 155 tests across 13 files
+npx vitest run       # 188 tests across 16 files
 npx eslint .         # 0 errors (8 react-refresh warnings are expected)
 npm run build        # also regenerates the sitemap
 npm run db:verify    # the data the pages describe is really there

@@ -17,9 +17,9 @@ suggestions           write-only for anon; count not meaningful
 
 Auth providers on the live project: `google: true`, `email: true`.
 
-- 10 test files, 119 tests passing
+- 16 test files, 188 tests passing
 - `npx tsc --noEmit` clean
-- `npx eslint .` — 0 errors, 7 react-refresh warnings (expected)
+- `npx eslint .` — 0 errors, 8 react-refresh warnings (expected)
 - `npm run build` clean, sitemap 56 URLs
 - `npm run db:verify` — all 12 live checks pass
 

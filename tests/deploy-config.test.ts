@@ -23,7 +23,7 @@
  * real regression the first time it ran.
  */
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = process.cwd();
@@ -68,10 +68,42 @@ describe('_headers is retained', () => {
     // Worker assets runtime and carries the site's security headers.
     expect(existsSync(headersPath)).toBe(true);
   });
-
   it('keeps the admin surface out of caches and out of search results', () => {
     const headers = readFileSync(headersPath, 'utf8');
     expect(headers).toMatch(/Cache-Control:\s*no-store/i);
     expect(headers).toMatch(/X-Robots-Tag:\s*noindex/i);
+  });
+});
+
+describe('the runbook quotes a real test-file count', () => {
+  /**
+   * Both docs had drifted - HANDOFF.md said 10 files, OPERATIONS.md said 13,
+   * while the suite had grown to 16. A pre-deploy checklist that understates
+   * the expected count is worse than no checklist: a reader who runs the
+   * suite, sees more tests than documented and assumes the docs are merely
+   * stale will make the same assumption on the day a test file fails to load
+   * and the count drops.
+   *
+   * Only the file count is asserted. The number of individual tests changes
+   * with almost every commit, so pinning it would fail constantly and be
+   * trained away; the file count changes rarely and deliberately.
+   */
+  const actual = readdirSync(path.join(ROOT, 'tests')).filter((f) =>
+    f.endsWith('.test.ts'),
+  ).length;
+
+  it.each([
+    ['docs/OPERATIONS.md', /(\d+) tests across (\d+) files/],
+    ['docs/HANDOFF.md', /(\d+) test files, (\d+) tests passing/],
+  ])('%s agrees with the tests/ directory', (doc, pattern) => {
+    const text = readFileSync(path.join(ROOT, doc), 'utf8');
+    const match = text.match(pattern);
+    expect(match, `${doc} no longer states a test count`).not.toBeNull();
+
+    // The two docs word it in opposite orders, so pick the capture that is
+    // the file count rather than assuming a position.
+    const [, first, second] = match!;
+    const claimed = doc.includes('HANDOFF') ? Number(first) : Number(second);
+    expect(claimed).toBe(actual);
   });
 });

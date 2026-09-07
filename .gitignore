@@ -16,3 +16,8 @@ coverage/
 seed.sql
 rounds.sql
 cycles.sql
+
+# Scratch file for multi-line commit messages. PowerShell mangles multi-line
+# -m arguments, so `git commit -F .commitmsg` is used instead; the file is
+# transient and must never be committed.
+.commitmsg
